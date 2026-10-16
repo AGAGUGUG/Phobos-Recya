@@ -810,6 +810,61 @@ DEFINE_HOOK(0x6AA88D, StripClass_RecheckCameo_FindFactoryDehardCode, 0x6)
 	return 0;
 }
 
+// Cameo.AlwaysExist only bypasses prerequisite greying. Items blocked by build
+// limits (BuildLimitGroup / vanilla BuildLimit / aircraft docks) must still
+// refuse orders, otherwise they can be pre-ordered indefinitely and get stuck
+// at 0% progress in the factory queue.
+static bool IsBlockedByBuildLimit(HouseClass* const pHouse, const TechnoTypeClass* const pType)
+{
+	// Mix BuildLimitGroup - the same check the sidebar greying uses.
+	if (HouseExt::ReachedBuildLimit(pHouse, pType, false))
+		return true;
+
+	if (pType->BuildLimit != 0)
+	{
+		if (pType->BuildLimit > 0)
+		{
+			// Same accounting as HouseExt::QueuedNum: the producing object is not
+			// counted against the limit until it leaves the factory.
+			int count = pHouse->CountOwnedNow(pType);
+
+			if (const auto pFactory = pHouse->GetPrimaryFactory(pType->WhatAmI(), pType->Naval, BuildCat::DontCare))
+			{
+				count += pFactory->CountTotal(pType);
+
+				if (pFactory->Object && pFactory->Object->GetType() == pType)
+					--count;
+			}
+
+			if (count >= pType->BuildLimit)
+				return true;
+		}
+		else if (pHouse->CountOwnedEver(pType) >= -pType->BuildLimit)
+		{
+			return true;
+		}
+	}
+
+	// Airport-bound aircraft: docks occupied by present or queued aircraft.
+	if (pType->WhatAmI() == AbstractType::AircraftType && static_cast<const AircraftTypeClass*>(pType)->AirportBound)
+	{
+		int docksUsed = 0;
+
+		for (const auto& pPadType : RulesClass::Instance->PadAircraft)
+		{
+			docksUsed += pHouse->CountOwnedAndPresent(pPadType);
+
+			if (const auto pFactory = pHouse->Primary_ForAircraft)
+				docksUsed += pFactory->CountTotal(pPadType);
+		}
+
+		if (docksUsed >= pHouse->AirportDocks)
+			return true;
+	}
+
+	return false;
+}
+
 DEFINE_HOOK(0x6AB6F5, SelectClass_Action_CheckBuildable, 0x6)
 {
 	enum { ContinueWithVoice = 0x6AB6FB, ContinueWithoutVoice = 0x6AB718, ShouldNotBuild = 0x6AB7D4 };
@@ -821,7 +876,13 @@ DEFINE_HOOK(0x6AB6F5, SelectClass_Action_CheckBuildable, 0x6)
 
 	GET(TechnoTypeClass* const, pType, EDI);
 
-	return TechnoTypeExt::Fetch(pType)->Cameo_AlwaysExist.Get(RulesExt::Global()->Cameo_AlwaysExist) ? ContinueWithoutVoice : ShouldNotBuild;
+	if (!TechnoTypeExt::Fetch(pType)->Cameo_AlwaysExist.Get(RulesExt::Global()->Cameo_AlwaysExist))
+		return ShouldNotBuild;
+
+	if (IsBlockedByBuildLimit(HouseClass::CurrentPlayer, pType))
+		return ShouldNotBuild;
+
+	return ContinueWithoutVoice;
 }
 
 static bool __fastcall HouseClass_ShouldDisableCameo_Check(HouseClass* pThis, void* _, TechnoTypeClass* pType)
@@ -893,15 +954,7 @@ DEFINE_HOOK(0x4C9D6E, FactoryClass_QueueProduction_CheckBuildable, 0x8)
 				if (pHouse->CanBuild(pTechnoType, false, false) != CanBuildResult::Buildable)
 					return false;
 
-				if (pTechnoType->WhatAmI() != AbstractType::AircraftType || !static_cast<AircraftTypeClass*>(pTechnoType)->AirportBound)
-					return true;
-
-				int ownedAircraft = 0;
-
-				for(const auto& pAircraft : RulesClass::Instance->PadAircraft)
-					ownedAircraft += pHouse->CountOwnedAndPresent(pAircraft);
-
-				return ownedAircraft < pHouse->AirportDocks;
+				return !IsBlockedByBuildLimit(pHouse, pTechnoType);
 			};
 			pTechnoTypeExt->CanBuildNowCheck = canBuildNow(pTechnoType);
 		}
