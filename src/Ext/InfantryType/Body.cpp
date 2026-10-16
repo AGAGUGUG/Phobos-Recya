@@ -52,6 +52,7 @@ void InfantryTypeExt::LoadFromINIFile(CCINIClass* const pINI)
 		if (exArtINI.ReadBool(pRateSection, key, &normalized))
 			this->CustomSequenceNormalized[i] = normalized ? 1 : 0;
 	}
+	this->IdleActionFrequency.Read(exINI, pSection, "IdleActionFrequency");
 }
 
 template <typename T>
@@ -75,6 +76,7 @@ void InfantryTypeExt::Serialize(T& Stm)
 		.Process(this->InfantryAutoDeploy)
 		.Process(this->CustomSequenceRates)
 		.Process(this->CustomSequenceNormalized)
+		.Process(this->IdleActionFrequency)
 		;
 }
 

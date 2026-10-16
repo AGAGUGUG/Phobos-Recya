@@ -988,7 +988,7 @@ DEFINE_HOOK(0x72958E, TunnelLocomotionClass_ProcessDigging_SlowdownDistance, 0x8
 
 	// Nov 27, 2024 - Starkku: The movement speed was actually also hardcoded here to 19, so the distance check made sense
 	// It can now be customized globally or per TechnoType however
-	auto const pTypeExt = static_cast<UnitExt*>(TechnoExt::Fetch(pLinkedTo))->GetTypeExtData();
+	auto const pTypeExt = TechnoExt::Fetch(pLinkedTo)->TypeExtData;
 	auto const pType = pTypeExt->OwnerObject();
 	int speed = pTypeExt->SubterraneanSpeed >= 0 ? pTypeExt->SubterraneanSpeed : RulesExt::Global()->SubterraneanSpeed;
 
@@ -2123,7 +2123,14 @@ DEFINE_HOOK(0x737E2A, UnitClass_ReceiveDamage_Sinkable_BridgeOrHeight, 0x6)
 
 	GET(UnitClass*, pThis, ESI);
 
-	return pThis->OnBridge || pThis->GetHeight() > 0 ? Explode : 0;
+	if (pThis->OnBridge)
+		return Explode;
+
+	auto const pLoco = pThis->Locomotor.GetInterfacePtr();
+	const bool isHover = pLoco && locomotion_cast<HoverLocomotionClass*>(pLoco);
+	const bool isHeldInAir = isHover ? pThis->IsAttackedByLocomotor : pThis->GetHeight() > 0;
+
+	return isHeldInAir ? Explode : 0;
 }
 
 // These hooks cause invisible barrier in multiplayer games, when a tank destroyed in tank bunker, and then the bunker has been sold
@@ -2835,6 +2842,33 @@ DEFINE_HOOK(0x741A66, UnitClass_SetDestination_JJVehFix, 0x5)
 
 #pragma endregion
 
+DEFINE_JUMP(LJMP, 0x4896B2, 0x4896BF) // No need this shit
+
+DEFINE_HOOK(0x480EF6, CellClass_DamageWall_BecomUntargetable, 0x6)
+{
+	GET(CellClass*, pThis, EDI);
+
+	pThis->BecomeUntargetable();
+
+	return 0;
+}
+
+DEFINE_HOOK_AGAIN(0x480952, Sub_480630_BecomUntargetable, 0xA)
+DEFINE_HOOK_AGAIN(0x48092B, Sub_480630_BecomUntargetable, 0xA)
+DEFINE_HOOK_AGAIN(0x4808FF, Sub_480630_BecomUntargetable, 0xA)
+DEFINE_HOOK_AGAIN(0x4808D8, Sub_480630_BecomUntargetable, 0xA)
+DEFINE_HOOK(0x4808A9, Sub_480630_BecomUntargetable, 0xA)
+{
+	GET(CellClass*, pCell, ESI);
+
+	pCell->BecomeUntargetable();
+
+	if (R->Origin() == 0x4808A9)
+		pCell->WallOwnerIndex = -1;
+
+	return 0;
+}
+
 DEFINE_HOOK(0x5194EF, InfantryClass_DrawIt_DrawShadow, 0x5)
 {
 	enum { SkipDraw = 0x51958A };
@@ -3419,8 +3453,11 @@ DEFINE_HOOK(0x7442D6, FootClass_ReadyToNextMission_MovingCheck, 0x6) // Unit
 	GET(FootClass*, pThis, ESI);
 	bool result = false;
 
-	if (RulesExt::Global()->ReadyToNextMission_MovingCheck || pThis->QueuedMission == Mission::Unload)
+	if (RulesExt::Global()->ReadyToNextMission_MovingCheck || pThis->QueuedMission == Mission::Unload || pThis->CurrentMission == Mission::Enter
+		|| pThis->CurrentMission == Mission::Capture || pThis->CurrentMission == Mission::Eaten || pThis->CurrentMission == Mission::Sabotage)
+	{
 		result = pThis->Locomotor.GetInterfacePtr()->Is_Moving_Now();
+	}
 
 	R->AL(result);
 	return R->Origin() + 0xF;
@@ -3750,4 +3787,12 @@ DEFINE_HOOK(0x454BF1, BuildingClass_UpdatePoweredAnim_Temporal, 0x6)
 	GET(BuildingClass*, pThis, ESI);
 
 	return pThis->TemporalTargetingMe && !RulesExt::Global()->Temporal_KillPoweredAnim ? ReturnFromFunction : 0;
+}
+
+DEFINE_HOOK(0x70F853, TechnoClass_Guard_OnLocomotorMoving, 0x6)
+{
+	GET(TechnoClass* const, pThis, ESI);
+
+	auto const pFoot = abstract_cast<FootClass*, true>(pThis);
+	return pFoot && pFoot->IsAttackedByLocomotor ? 0x70F85F : 0;
 }

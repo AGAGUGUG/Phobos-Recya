@@ -20,6 +20,8 @@ TechnoExt::~TechnoExt()
 	// Besides BuildingClass, calling pThis->WhatAmI() here will only result in AbstractType::None
 	auto const whatAmI = pType->WhatAmI();
 
+	pTypeExt->Array.Remove(pThis);
+
 	if (whatAmI == AbstractType::UnitType)
 	{
 		auto invalidateCellPointer = [pThis, pType](CellClass* pCell, bool last)
@@ -129,7 +131,7 @@ bool TechnoExt::IsActive(TechnoClass* pThis)
 		&& pThis->Health > 0
 		&& !pThis->InLimbo
 		&& !pThis->TemporalTargetingMe
-		&& !pThis->BeingWarpedOut
+		&& !pThis->IsBeingWarpedOut()
 		&& !pThis->Deactivated
 		&& !pThis->IsUnderEMP()
 		;
@@ -632,18 +634,20 @@ bool TechnoExt::IsTypeImmune(TechnoClass* pThis, TechnoTypeClass* pType, TechnoC
 }
 
 // Gets whether or not techno has listed AttachEffect types active on it
-bool TechnoExt::ExtData::HasAttachedEffects(std::vector<AttachEffectTypeClass*> const& attachEffectTypes, bool requireAll, bool ignoreSameSource,
-	TechnoClass* pInvoker, AbstractClass* pSource, std::vector<int> const* minCounts, std::vector<int> const* maxCounts, bool requireAnims) const
+bool TechnoExt::ExtData::HasAttachedEffects(std::vector<AttachEffectTypeClass*> const& attachEffectTypes, bool requireAll, bool ignoreSameSource, bool sameSourceOnly,
+	TechnoClass* pInvoker, AbstractClass* pSource, std::vector<int> const* minCounts, std::vector<int> const* maxCounts, bool requireAnims, AffectedHouse affectedHouse) const
 {
 	unsigned int foundCount = 0;
 	unsigned int typeCounter = 1;
-	const bool checkSource = ignoreSameSource && pInvoker && pSource;
+	const bool needHouseCheck = pInvoker && affectedHouse != AffectedHouse::All;
+	ignoreSameSource = ignoreSameSource && pInvoker && pSource;
+	sameSourceOnly = sameSourceOnly && pInvoker && pSource;
 
 	for (auto const& pType : attachEffectTypes)
 	{
 		if (pType->Cumulative)
 		{
-			const int cumulativeCount = this->GetAttachedEffectCumulativeCount(pType, ignoreSameSource, pInvoker, pSource, requireAnims);
+			const int cumulativeCount = this->GetAttachedEffectCumulativeCount(pType, ignoreSameSource, sameSourceOnly, pInvoker, pSource, requireAnims, affectedHouse);
 			bool matched = cumulativeCount > 0;
 			const unsigned int minSize = minCounts ? minCounts->size() : 0;
 			const unsigned int maxSize = maxCounts ? maxCounts->size() : 0;
@@ -677,7 +681,13 @@ bool TechnoExt::ExtData::HasAttachedEffects(std::vector<AttachEffectTypeClass*> 
 
 				if (type == pType && attachEffect->IsActive() && (!requireAnims || !type->HasAnim() || attachEffect->HasAnim()))
 				{
-					if (checkSource && attachEffect->IsFromSource(pInvoker, pSource))
+					if (ignoreSameSource && attachEffect->IsFromSource(pInvoker, pSource))
+						continue;
+
+					if (sameSourceOnly && !attachEffect->IsFromSource(pInvoker, pSource))
+						continue;
+
+					if (needHouseCheck && !EnumFunctions::CanTargetHouse(affectedHouse, pInvoker->Owner, attachEffect->GetInvoker() ? attachEffect->GetInvoker()->Owner : attachEffect->GetInvokerHouse()))
 						continue;
 
 					// Only need to find one match, can stop here.
@@ -704,10 +714,10 @@ bool TechnoExt::ExtData::HasAttachedEffects(std::vector<AttachEffectTypeClass*> 
 }
 
 // Gets how many counts of same cumulative AttachEffect type instance techno has active on it.
-int TechnoExt::GetAttachedEffectCumulativeCount(AttachEffectTypeClass* pAttachEffectType, bool ignoreSameSource, TechnoClass* pInvoker, AbstractClass* pSource, bool requireAnims) const
+int TechnoExt::GetAttachedEffectCumulativeCount(AttachEffectTypeClass* pAttachEffectType, bool ignoreSameSource, bool sameSourceOnly, TechnoClass* pInvoker, AbstractClass* pSource, bool requireAnims, AffectedHouse affectedHouse) const
 {
 	unsigned int foundCount = 0;
-	const bool checkSource = ignoreSameSource && pInvoker && pSource;
+	const bool needHouseCheck = pInvoker && affectedHouse != AffectedHouse::All;
 
 	for (auto const& attachEffect : this->AttachedEffects)
 	{
@@ -715,7 +725,13 @@ int TechnoExt::GetAttachedEffectCumulativeCount(AttachEffectTypeClass* pAttachEf
 
 		if (type == pAttachEffectType && attachEffect->IsActive() && (!requireAnims || !type->HasAnim() || attachEffect->HasAnim()))
 		{
-			if (checkSource && attachEffect->IsFromSource(pInvoker, pSource))
+			if (ignoreSameSource && attachEffect->IsFromSource(pInvoker, pSource))
+				continue;
+
+			if (sameSourceOnly && !attachEffect->IsFromSource(pInvoker, pSource))
+				continue;
+
+			if (needHouseCheck && !EnumFunctions::CanTargetHouse(affectedHouse, pInvoker->Owner, attachEffect->GetInvoker() ? attachEffect->GetInvoker()->Owner : attachEffect->GetInvokerHouse()))
 				continue;
 
 			foundCount++;
@@ -1260,7 +1276,7 @@ bool TechnoExt::HandleDelayedFireWithPauseSequence(TechnoClass* pThis, WeaponTyp
 
 bool TechnoExt::IsHealthInThreshold(TechnoClass* pObject, double min, double max)
 {
-	if (!pObject->Health && !pObject->GetType()->Strength)
+	if (pObject->Health <= 0 && !pObject->GetType()->Strength)
 		return true;
 
 	const double hp = pObject->GetHealthPercentage();
@@ -1287,6 +1303,7 @@ bool TechnoExt::CanBeRecruitedFix(FootClass* pThis, HouseClass* pHouse)
         !pThis->IsAlive ||
         pThis->Health <= 0 ||
         pThis->InLimbo ||
+		pThis->IsSinking ||
         pThis->Owner != pHouse)
     {
         return false;
@@ -1479,7 +1496,7 @@ bool __fastcall TechnoExt::ApplyKillDriver(TechnoClass** pData, void*, HouseClas
 				const auto pOperator = static_cast<FootClass*>(*passenger);
 				passengers.RemovePassenger(pOperator);
 
-				if (pType->Gunner && !passengers.NumPassengers)
+				if (pType->Gunner && passengers.NumPassengers <= 0)
 					pThis->RemoveGunner(pOperator);
 
 				pOperator->RegisterDestruction(pKiller);
@@ -1500,7 +1517,7 @@ bool __fastcall TechnoExt::ApplyKillDriver(TechnoClass** pData, void*, HouseClas
 			const auto pNextPassenger = abstract_cast<FootClass*>(pPassenger->NextObject);
 			passengers.RemovePassenger(pPassenger);
 
-			if (pType->Gunner && !passengers.NumPassengers)
+			if (pType->Gunner && passengers.NumPassengers <= 0)
 				pThis->RemoveGunner(pPassenger);
 
 			if (kill || !TechnoExt::EjectRandomly(pPassenger, pThis->Location, 128, false))
@@ -1569,6 +1586,10 @@ bool __fastcall TechnoExt::ApplyKillDriver(TechnoClass** pData, void*, HouseClas
 
 	pThis->SetTarget(nullptr);
 	pThis->SetDestination(nullptr, false);
+
+	// Thank you to NetsuNegi for the guidance.
+	if (!pThis->IsAttackedByLocomotor)
+		pThis->StopMoving();
 
 	auto pTag = pThis->AttachedTag;
 
@@ -1656,6 +1677,18 @@ FireError TechnoExt::GetFireErrorIgnoreDisableWeapons(TechnoClass* pThis, Abstra
 	return fireError;
 }
 
+bool TechnoExt::DriverKilled(TechnoClass* pThis)
+{
+	// Determine whether the driver was killed.
+	return AresHelper::CanUseAres && reinterpret_cast<DummyExtHere*>(pThis->align_154)->DriverKilled;
+}
+
+Mission TechnoExt::DriverKilledMission(TechnoClass* pThis, Mission mission)
+{
+	// After the driver is killed, the vehicle will no longer perform any missions other than `Harmless`.
+	return TechnoExt::DriverKilled(pThis) ? Mission::Harmless : mission;
+}
+
 // =============================
 // load / save
 
@@ -1664,6 +1697,7 @@ void TechnoExt::Serialize(T& Stm)
 {
 	Stm
 		.Process(this->TypeExtData)
+		.Process(this->RandomFactor)
 		.Process(this->Shield)
 		.Process(this->LaserTrails)
 		.Process(this->AttachedEffects)
@@ -1740,7 +1774,9 @@ void TechnoExt::Serialize(T& Stm)
 		.Process(this->LastTargetCrd)
 		.Process(this->LastTargetCrdClearTimer)
 		.Process(this->ShouldBeDead)
+		.Process(this->AutoDeathFlag)
 		.Process(this->PreventCrewEscape)
+		.Process(this->OriginVeterancy)
 		;
 }
 

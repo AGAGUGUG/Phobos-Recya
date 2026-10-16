@@ -26,6 +26,7 @@ public:
 	std::vector<std::vector<CoordStruct>> DeployedWeaponBurstFLHs;
 	std::vector<std::vector<CoordStruct>> EliteDeployedWeaponBurstFLHs;
 	Nullable<bool> InfantryAutoDeploy;
+	Nullable<PartialVector2D<double>> IdleActionFrequency;
 
 	// Per-sequence animation rates read from the infantry's art section
 	std::vector<int> CustomSequenceRates;
@@ -51,6 +52,7 @@ public:
 		, InfantryAutoDeploy {}
 		, CustomSequenceRates(42, -1)
 		, CustomSequenceNormalized(42, -1)
+		, IdleActionFrequency {}
 	{ }
 
 	InfantryTypeClass* OwnerObject() const

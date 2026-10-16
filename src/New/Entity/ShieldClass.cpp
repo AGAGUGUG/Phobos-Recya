@@ -609,8 +609,10 @@ void ShieldClass::ConvertCheck(TechnoTypeClass* pTechnoType, ShieldClass* pOldSh
 {
 	const auto pTechnoExt = TechnoExt::Fetch(this->Techno);
 	const auto pOldType = this->Type;
+	const bool allowTransfer = pOldShield ? pOldType->AllowTransfer.Get(Attached)
+		: pOldType->AllowTransfer_Convert.Get(pOldType->AllowTransfer.Get(Attached));
 
-	if (!pOldType->AllowTransfer.Get(Attached))
+	if (!allowTransfer)
 	{
 		const auto pTechnoTypeExt = TechnoTypeExt::Fetch(pTechnoType);
 		pTechnoExt->CurrentShieldType = pTechnoTypeExt->ShieldType && pTechnoTypeExt->ShieldType->Strength > 0 ? pTechnoTypeExt->ShieldType : nullptr;
@@ -1096,7 +1098,7 @@ void ShieldClass::UpdateIdleAnim(ShieldTypeClass* pType, double ratio)
 
 void ShieldClass::UpdateTint()
 {
-	if (this->Type->HasTint())
+	if (this->Type->Tint->Enabled)
 	{
 		auto const pTechno = this->Techno;
 		TechnoExt::Fetch(pTechno)->UpdateTintValues();

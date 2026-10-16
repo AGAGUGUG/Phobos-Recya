@@ -41,7 +41,8 @@ int TechnoExt::PickWeaponIndex(TechnoClass* pThis, TechnoClass* pTargetTechno, A
 				|| !EnumFunctions::CanTargetHouse(pSecondExt->CanTargetHouses, pThis->Owner, pTargetTechno->Owner)
 				|| !pSecondExt->IsHealthInThreshold(pTargetTechno)
 				|| !pSecondExt->IsVeterancyInThreshold(pTargetTechno)
-				|| !pSecondExt->HasRequiredAttachedEffects(pTargetTechno, pThis))
+				|| !pSecondExt->HasRequiredAttachedEffects(pTargetTechno, pThis)
+				|| (!pSecondExt->CanTarget_DriverKilled && TechnoExt::DriverKilled(pTargetTechno)))
 			{
 				return weaponIndexOne;
 			}
@@ -89,7 +90,8 @@ int TechnoExt::PickWeaponIndex(TechnoClass* pThis, TechnoClass* pTargetTechno, A
 				|| !EnumFunctions::CanTargetHouse(pFirstExt->CanTargetHouses, pThis->Owner, pTargetTechno->Owner)
 				|| !pFirstExt->IsHealthInThreshold(pTargetTechno)
 				|| !pFirstExt->IsVeterancyInThreshold(pTargetTechno)
-				|| !firstAllowedAE)
+				|| !firstAllowedAE
+				|| (!pFirstExt->CanTarget_DriverKilled && TechnoExt::DriverKilled(pTargetTechno)))
 			{
 				return weaponIndexTwo;
 			}
@@ -244,18 +246,19 @@ int TechnoExt::GetWeaponIndexAgainstWall(TechnoClass* pThis, OverlayTypeClass* p
 	return weaponIndex;
 }
 
-void TechnoExt::ApplyKillWeapon(TechnoClass* pThis, TechnoClass* pSource, WarheadTypeClass* pWH)
+void TechnoExt::ApplyKillWeapon(TechnoClass* pThis, TechnoClass* pSource, WarheadTypeClass* pWH, HouseClass* pSourceHouse)
 {
 	auto const pTypeExt = TechnoExt::Fetch(pThis)->TypeExtData;
 	auto const pWHExt = WarheadTypeExt::Fetch(pWH);
 	const bool hasFilters = pTypeExt->SuppressKillWeapons_Types.size() > 0;
+	pSourceHouse = pSource ? pSource->Owner : pSourceHouse;
 
 	// KillWeapon can be triggered without the source
-	if (pWHExt->KillWeapon && (!pSource || EnumFunctions::CanTargetHouse(pWHExt->KillWeapon_AffectsHouse, pSource->Owner, pThis->Owner))
+	if (pWHExt->KillWeapon && (!pSourceHouse || EnumFunctions::CanTargetHouse(pWHExt->KillWeapon_AffectsHouse, pSourceHouse, pThis->Owner))
 		&& EnumFunctions::IsTechnoEligible(pThis, pWHExt->KillWeapon_AffectsTarget))
 	{
 		if (!pTypeExt->SuppressKillWeapons || (hasFilters && !pTypeExt->SuppressKillWeapons_Types.Contains(pWHExt->KillWeapon)))
-			WeaponTypeExt::DetonateAt(pWHExt->KillWeapon, pThis, pSource);
+			WeaponTypeExt::DetonateAt(pWHExt->KillWeapon, pThis, pSource, pSourceHouse);
 	}
 
 	// KillWeapon.OnFirer must have a source
@@ -373,9 +376,10 @@ int TechnoExt::ApplyForceWeaponInRange(AbstractClass* pTarget)
 	return forceWeaponIndex;
 }
 
-bool TechnoExt::MultiWeaponCanFire(TechnoClass* const pThis, AbstractClass* const pTarget, WeaponTypeClass* const pWeaponType)
+bool TechnoExt::MultiWeaponCanFire(TechnoClass* const pThis, AbstractClass* const pTarget, WeaponTypeClass* const pWeaponType, const bool ignoreNeverUse)
 {
-	if (!pWeaponType || pWeaponType->NeverUse
+	if (!pWeaponType
+		|| (!ignoreNeverUse && pWeaponType->NeverUse)
 		|| (pThis->InOpenToppedTransport && !pWeaponType->FireInTransport))
 	{
 		return false;
@@ -454,7 +458,7 @@ bool TechnoExt::MultiWeaponCanFire(TechnoClass* const pThis, AbstractClass* cons
 		if (pTechno->AttachedBomb ? pWH->IvanBomb : pWH->BombDisarm)
 			return false;
 
-		if (!pWH->Temporal && pTechno->BeingWarpedOut)
+		if (!pWH->Temporal && pTechno->IsBeingWarpedOut())
 			return false;
 
 		if (pWH->Parasite

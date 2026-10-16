@@ -34,6 +34,7 @@ public:
 	}
 
 	TechnoTypeExt* TypeExtData;
+	int RandomFactor;
 	std::unique_ptr<ShieldClass> Shield;
 	std::vector<std::unique_ptr<LaserTrailClass>> LaserTrails;
 	std::vector<std::unique_ptr<AttachEffectClass>> AttachedEffects;
@@ -139,6 +140,7 @@ public:
 	bool JumpjetStraightAscend; // Is set to true jumpjet units will ascend straight and do not adjust rotation or position during it.
 
 	bool ShouldBeDead;
+	int AutoDeathFlag;
 
 	std::unique_ptr<ShiftSchedule> QueuedShift;
 	TechnoClass* ShiftApplier;
@@ -154,8 +156,11 @@ public:
 
 	bool PreventCrewEscape;
 
+	double OriginVeterancy;
+
 	TechnoExt(TechnoClass* OwnerObject) : RadioExt(OwnerObject)
 		, TypeExtData { nullptr }
+		, RandomFactor { 0 }
 		, Shield {}
 		, LaserTrails {}
 		, AttachedEffects {}
@@ -251,9 +256,11 @@ public:
 		, ExtraTurretRecoil {}
 		, ExtraBarrelRecoil {}
 		, ShouldBeDead { false }
+		, AutoDeathFlag { 0 }
 		, DropCrate { -1 }
 		, DropCrateType { Powerup::Money }
 		, PreventCrewEscape { false }
+		, OriginVeterancy { 0.0 }
 	{ }
 
 	void OnEarlyUpdate();
@@ -266,7 +273,7 @@ public:
 	virtual void OnDeferredAllocation() override { this->InitializeState(); }
 
 	// True while the object is hidden underground (subterranean units); false for
-	// everything else. Overridden by UnitExt, which owns the burrow state.
+	// everything else. Overridden by FootExt, which owns the burrow state.
 	virtual bool IsBurrowedState() const { return false; }
 
 	// True while the object is inside a tunnel (foot units); false for everything
@@ -281,7 +288,7 @@ public:
 	void UpdateLaserTrails();
 	void UpdateAttachEffects();
 	void UpdateGattlingRateDownReset();
-	void UpdateCumulativeAttachEffects(AttachEffectTypeClass* pAttachEffectType, bool createAnim = false);
+	bool UpdateCumulativeAttachEffects(AttachEffectTypeClass* pAttachEffectType, bool createAnim = false);
 	void UpdateAEAnimDrawingLogic();
 	bool RecalculateStatMultipliers(AttachEffectClass* pAttachEffect = nullptr);
 	void UpdateTemporal();
@@ -293,8 +300,8 @@ public:
 	void InitializeAttachEffects();
 	void InitializeAttachments();
 	void UpdateSelfOwnedAttachEffects();
-	bool HasAttachedEffects(std::vector<AttachEffectTypeClass*> const& attachEffectTypes, bool requireAll, bool ignoreSameSource, TechnoClass* pInvoker, AbstractClass* pSource, std::vector<int> const* minCounts, std::vector<int> const* maxCounts, bool requireAnims = false) const;
-	int GetAttachedEffectCumulativeCount(AttachEffectTypeClass* pAttachEffectType, bool ignoreSameSource = false, TechnoClass* pInvoker = nullptr, AbstractClass* pSource = nullptr, bool requireAnims = false) const;
+	bool HasAttachedEffects(std::vector<AttachEffectTypeClass*> const& attachEffectTypes, bool requireAll, bool ignoreSameSource, bool sameSourceOnly, TechnoClass* pInvoker, AbstractClass* pSource, std::vector<int> const* minCounts, std::vector<int> const* maxCounts, bool requireAnims = false, AffectedHouse affectedHouse = AffectedHouse::All) const;
+	int GetAttachedEffectCumulativeCount(AttachEffectTypeClass* pAttachEffectType, bool ignoreSameSource = false, bool sameSourceOnly = false, TechnoClass* pInvoker = nullptr, AbstractClass* pSource = nullptr, bool requireAnims = false, AffectedHouse affectedHouse = AffectedHouse::All) const;
 	void InitializeDisplayInfo(TechnoTypeClass* pType);
 	void StopIdleAction();
 	void ApplyIdleAction();
@@ -420,7 +427,7 @@ public:
 	static double GetCurrentSpeedMultiplier(FootClass* pThis);
 	static double GetCurrentFirepowerMultiplier(TechnoClass* pThis);
 	static double GetCurrentArmorMultiplier(TechnoClass* pThis, TechnoTypeClass* pType, HouseClass* pSourceHouse = nullptr, WarheadTypeClass* pWarhead = nullptr);
-	static double CalculateArmorMultipliers(TechnoClass* pThis, WarheadTypeClass* pWarhead, HouseClass* pSourceHouse, bool hitAnim = false);
+	static double CalculateArmorMultipliers(TechnoClass* pThis, WarheadTypeClass* pWarhead, HouseClass* pSourceHouse, bool realHit = false);
 	static void DrawSelfHealPips(TechnoClass* pThis, Point2D* pLocation, RectangleStruct* pBounds);
 	static void DrawInsignia(TechnoClass* pThis, Point2D* pLocation, RectangleStruct* pBounds);
 	static void ApplyGainedSelfHeal(TechnoClass* pThis);
@@ -464,6 +471,8 @@ public:
 	static void DrawExtraImage(UnitClass* pThis, Point2D* pLocation, RectangleStruct* pBounds, DirStruct dir = DirStruct(0), bool transparent = false, int tilt = -1);
 	static void DrawExtraImage(InfantryClass* pThis, Point2D* pLocation, RectangleStruct* pBounds, DirStruct dir = DirStruct(0), bool transparent = false, Sequence action = Sequence::Nothing);
 	static void DrawExtraImage(AircraftClass* pThis, Point2D* pLocation, RectangleStruct* pBounds, DirStruct dir = DirStruct(0), bool transparent = false);
+	static bool DriverKilled(TechnoClass* pThis);
+	static Mission DriverKilledMission(TechnoClass* pThis, Mission mission);
 
 	// WeaponHelpers.cpp
 	static int PickWeaponIndex(TechnoClass* pThis, TechnoClass* pTargetTechno, AbstractClass* pTarget, int weaponIndexOne, int weaponIndexTwo, bool allowFallback = true, bool allowAAFallback = true);
@@ -475,10 +484,10 @@ public:
 	static WeaponTypeClass* GetCurrentWeapon(TechnoClass* pThis, TechnoTypeClass* pType, int& weaponIndex, bool getSecondary = false);
 	static WeaponTypeClass* GetCurrentWeapon(TechnoClass* pThis, TechnoTypeClass* pType, bool getSecondary = false);
 	static int GetWeaponIndexAgainstWall(TechnoClass* pThis, OverlayTypeClass* pWallOverlayType);
-	static void ApplyKillWeapon(TechnoClass* pThis, TechnoClass* pSource, WarheadTypeClass* pWH);
+	static void ApplyKillWeapon(TechnoClass* pThis, TechnoClass* pSource, WarheadTypeClass* pWH, HouseClass* pSourceHouse);
 	static void ApplyRevengeWeapon(TechnoClass* pThis, TechnoClass* pSource, WarheadTypeClass* pWH);
 	static bool TryToCreateCrate(CoordStruct location, Powerup selectedPowerup = Powerup::Money, int maxCellRange = 10);
-	static bool MultiWeaponCanFire(TechnoClass* const pThis, AbstractClass* const pTarget, WeaponTypeClass* const pWeaponType);
+	static bool MultiWeaponCanFire(TechnoClass* const pThis, AbstractClass* const pTarget, WeaponTypeClass* const pWeaponType, const bool ignoreNeverUse = false);
 	static bool HasWeaponsDisabled(TechnoClass* pThis);
 	static FireError GetFireErrorIgnoreDisableWeapons(TechnoClass* pThis, AbstractClass* pTarget, int weaponIndex, bool ignoreRange);
 };

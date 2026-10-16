@@ -288,11 +288,7 @@ DEFINE_HOOK(0x44FBBF, CreateBuildingFromINIFile_AfterCTOR_BeforeUnlimbo, 0x8)
 	if (auto const pExt = BuildingExt::TryFetch(pBld))
 	{
 		pExt->IsCreatedFromMapFile = true;
-
-		GET_STACK(bool, hasPower, STACK_OFFSET(0xEC, -0xDC));
-
-		if (hasPower)
-			pExt->HasPowerFromMapFile = true;
+		pExt->HasPowerFromMapFile = true;
 	}
 
 	return 0;
@@ -1627,6 +1623,7 @@ DEFINE_HOOK(0x4593C7, BuildingClass_DestroyTankBunker, 0x6)
 	if (pThis->Type->GetFoundationWidth() % 2)
 	{
 		EjectBunkeredUnit(pThis, pUnit);
+		R->EBX(0);
 		return SkipGameCode;
 	}
 

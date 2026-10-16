@@ -12,6 +12,7 @@ decltype(AresFunctions::ReverseEngineer) AresFunctions::ReverseEngineer = nullpt
 decltype(AresFunctions::IsTargetConstraintsEligible) AresFunctions::IsTargetConstraintsEligible = nullptr;
 decltype(AresFunctions::UnitDeliveryStateMachine_Update) AresFunctions::UnitDeliveryStateMachine_Update = nullptr;
 decltype(AresFunctions::SetSpotlight) AresFunctions::SetSpotlight = nullptr;
+decltype(AresFunctions::ApplyAbductor) AresFunctions::ApplyAbductor = nullptr;
 decltype(AresFunctions::ApplyPermaMC) AresFunctions::ApplyPermaMC = nullptr;
 decltype(AresFunctions::DetailsCurrentlyEnabled) AresFunctions::DetailsCurrentlyEnabled = nullptr;
 decltype(AresFunctions::SendPDPlane) AresFunctions::SendPDPlane = nullptr;
@@ -21,6 +22,8 @@ PhobosMap<BombClass*, WeaponTypeClass**>* AresFunctions::BombExtMap = nullptr;
 
 decltype(AresFunctions::GetTunnel) AresFunctions::GetTunnel = nullptr;
 decltype(AresFunctions::AddPassengerFromTunnel) AresFunctions::AddPassengerFromTunnel = nullptr;
+
+decltype(AresFunctions::GetCrew) AresFunctions::GetCrew = nullptr;
 
 decltype(AresFunctions::FindEVAIndex) AresFunctions::FindEVAIndex = nullptr;
 
@@ -57,6 +60,8 @@ void AresFunctions::InitAres3_0()
 
 	NOTE_ARES_FUN(SetSpotlight, 0x046420);
 
+	NOTE_ARES_FUN(ApplyAbductor, 0x054A80);
+	
 	NOTE_ARES_FUN(ApplyPermaMC, 0x052CD0);
 
 	NOTE_ARES_FUN(DetailsCurrentlyEnabled, 0x02A6C0);
@@ -73,6 +78,9 @@ void AresFunctions::InitAres3_0()
 	// BuildingTypeExt
 	NOTE_ARES_FUN(AresFunctions::GetTunnel, 0x0D740);
 	NOTE_ARES_FUN(AresFunctions::AddPassengerFromTunnel, 0x09000);
+
+	// HouseExt
+	NOTE_ARES_FUN(GetCrew, 0x021230);
 
 	// VoxClass
 	NOTE_ARES_FUN(AresFunctions::FindEVAIndex, 0x063560);
@@ -109,6 +117,8 @@ void AresFunctions::InitAres3_0p1()
 
 	NOTE_ARES_FUN(SetSpotlight, 0x046F90);
 
+	NOTE_ARES_FUN(ApplyAbductor, 0x055730);
+
 	NOTE_ARES_FUN(ApplyPermaMC, 0x053980);
 
 	NOTE_ARES_FUN(DetailsCurrentlyEnabled, 0x02B1C0);
@@ -125,6 +135,9 @@ void AresFunctions::InitAres3_0p1()
 	// BuildingTypeExt
 	NOTE_ARES_FUN(AresFunctions::GetTunnel, 0x0DA30);
 	NOTE_ARES_FUN(AresFunctions::AddPassengerFromTunnel, 0x09040);
+
+	// HouseExt
+	NOTE_ARES_FUN(GetCrew, 0x021CB0);
 
 	// VoxClass
 	NOTE_ARES_FUN(AresFunctions::FindEVAIndex, 0x0642B0);

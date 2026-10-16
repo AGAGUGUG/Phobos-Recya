@@ -284,7 +284,7 @@ void SWTypeExt::LoadFromINIFile(CCINIClass* const pINI)
 	AttachmentTransformGroup::Parse(this->Attachment_Transform, exINI, pSection, AffectedHouse::Owner);
 
 	// Convert.From & Convert.To
-	TypeConvertGroup::Parse(this->Convert_Pairs, exINI, pSection, AffectedHouse::Owner);
+	this->Convert_Pairs.Read(exINI, pSection, AffectedHouse::Owner);
 
 	this->ShowDesignatorRange.Read(exINI, pSection, "ShowDesignatorRange");
 

@@ -5,6 +5,7 @@
 #include <Ext/Aircraft/Body.h>
 #include <Ext/Building/Body.h>
 #include <Ext/House/Body.h>
+#include <Ext/HouseType/Body.h>
 #include <Ext/WarheadType/Body.h>
 #include <Ext/Sidebar/Body.h>
 #include <Ext/EBolt/Body.h>
@@ -12,6 +13,7 @@
 #include <Ext/CaptureManager/Body.h>
 #include <Ext/Scenario/Body.h>
 #include <Ext/Rules/Body.h>
+#include <Ext/WeaponType/Body.h>
 
 #include <New/Entity/Ares/RadarJammerClass.h>
 
@@ -243,6 +245,60 @@ static bool __fastcall AresHouseExt_UpdateKeepAlive(AresHouseExt* pExt_Ares, voi
 
 #pragma endregion
 
+#pragma region AresGetCrew
+
+static InfantryTypeClass* __fastcall AresHouseExt_GetCrew(HouseClass** pExt_Ares, void*)
+{
+	auto const pTypeExt = HouseTypeExt::Fetch((*pExt_Ares)->Type);
+
+	if (pTypeExt->Crew.isset())
+		return pTypeExt->Crew.Get();
+
+	return AresFunctions::GetCrew(pExt_Ares);
+}
+
+#pragma endregion
+
+#pragma region AresDriverKilled
+
+namespace AresDriverKilledTemp
+{
+	WeaponTypeExt* Ext = nullptr;
+}
+
+static bool __fastcall ApplyAbductor_Init(WeaponTypeClass** pExt_Ares, void*, TechnoClass* pFirer, FootClass* pTarget)
+{
+	AresDriverKilledTemp::Ext = WeaponTypeExt::Fetch(*pExt_Ares);
+	const bool result = AresFunctions::ApplyAbductor(pExt_Ares, pFirer, pTarget);
+	AresDriverKilledTemp::Ext = nullptr;
+
+	return result;
+}
+
+struct DummyExtHere
+{
+	char _pad0[0x9C];
+	bool DriverKilled;
+};
+
+static bool __fastcall ApplyAbductor_DriverKilled(TechnoClass* pTechno, void*, HouseClass* pHouse, bool announce)
+{
+	if (TechnoExt::DriverKilled(pTechno))
+	{
+		if (AresDriverKilledTemp::Ext->Abductor_ChangeOwner_IgnoreDriverKilled)
+			return false;
+
+		auto const pExt_Ares = reinterpret_cast<DummyExtHere*>(pTechno->align_154);
+
+		if (AresDriverKilledTemp::Ext->Abductor_ChangeOwner_ResetDriverKilled)
+			pExt_Ares->DriverKilled = pHouse->IsNeutral();
+	}
+
+	return pTechno->SetOwningHouse(pHouse, announce);
+}
+
+#pragma endregion
+
 DEFINE_HOOK(0x440580, BuildingClass_Unlimbo_UnitDeliveryFix, 0x5)
 {
 	if (UnitDeliveryTemp::Placing)
@@ -387,6 +443,14 @@ void Apply_Ares3_0_Patches()
 
 	// Ares' `KeepAlive` adds global tags.
 	Patch::Apply_LJMP(AresHelper::AresBaseAddress + 0x21F70, GET_OFFSET(AresHouseExt_UpdateKeepAlive));
+
+	// Add a new custom crew for a country.
+	Patch::Apply_CALL(AresHelper::AresBaseAddress + 0x4C836, GET_OFFSET(AresHouseExt_GetCrew));
+
+	// A unit whose driver has been killed will no longer change sides.
+	Patch::Apply_CALL(AresHelper::AresBaseAddress + 0x537CC, GET_OFFSET(ApplyAbductor_Init));
+	Patch::Apply_CALL(AresHelper::AresBaseAddress + 0x5652E, GET_OFFSET(ApplyAbductor_Init));
+	Patch::Apply_CALL6(AresHelper::AresBaseAddress + 0x54DC0, GET_OFFSET(ApplyAbductor_DriverKilled));
 }
 
 void Apply_Ares3_0p1_Patches()
@@ -514,4 +578,12 @@ void Apply_Ares3_0p1_Patches()
 
 	// Ares' `KeepAlive` adds global tags.
 	Patch::Apply_LJMP(AresHelper::AresBaseAddress + 0x229F0, GET_OFFSET(AresHouseExt_UpdateKeepAlive));
+
+	// Add a new custom crew for a country.
+	Patch::Apply_CALL(AresHelper::AresBaseAddress + 0x4D496, GET_OFFSET(AresHouseExt_GetCrew));
+
+	// A unit whose driver has been killed will no longer change sides.
+	Patch::Apply_CALL(AresHelper::AresBaseAddress + 0x5447C, GET_OFFSET(ApplyAbductor_Init));
+	Patch::Apply_CALL(AresHelper::AresBaseAddress + 0x571DE, GET_OFFSET(ApplyAbductor_Init));
+	Patch::Apply_CALL6(AresHelper::AresBaseAddress + 0x55A70, GET_OFFSET(ApplyAbductor_DriverKilled));
 }

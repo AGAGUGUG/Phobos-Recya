@@ -43,6 +43,9 @@ public:
 
 	static void(__thiscall* SetSpotlight)(void*, BuildingLightClass* pSpotlight);
 
+	// WeaponTypeExt
+	static bool(__thiscall* ApplyAbductor)(WeaponTypeClass**, TechnoClass* pFirer, FootClass* pTarget);
+	
 	// WarheadTypeExt
 	static bool(__thiscall* ApplyPermaMC)(void*, HouseClass* pSourceHouse, AbstractClass* pTarget);
 
@@ -58,6 +61,10 @@ public:
 	// BuildingTypeExt
 	static void* (__thiscall* GetTunnel)(void*, HouseClass*);
 	static void(__thiscall* AddPassengerFromTunnel)(void*, BuildingClass*, FootClass*);
+
+	// HouseExt
+	static bool(__thiscall* ReverseEngineer)(void*, TechnoTypeClass* pType);
+	static InfantryTypeClass* (__thiscall* GetCrew)(void*);
 
 	// VoxClass
 	static int(__stdcall* FindEVAIndex)(const char* buffer);

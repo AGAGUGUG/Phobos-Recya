@@ -163,6 +163,10 @@ This page lists all the individual contributions to the project by their author.
   - Unit & infantry auto-conversion on ammo change
   - Restore the ScriptType action#24 `Play speech` from Tiberian Sun
   - Modify ammo on impact
+  - Tiberium ramp expansion support
+  - Fix crashes and freezes caused by Tiberium growth and spread
+  - Fix Tiberium types not supporting overrides in map and game mode INIs
+  - Tiberium veins overlay palette fix
 - **Starkku**:
   - Misc. minor bugfixes & improvements
   - AI script actions:
@@ -450,6 +454,16 @@ This page lists all the individual contributions to the project by their author.
   - SkipMapSelect Enhancement
   - Add a global default value for `KeepAlive`
   - Customized transport plane for teams
+  - Fix the bug where *Customizable crew type per country* overrides the pre-techno settings
+  - Enter the grinder voice
+  - Customize the country displayed in `Sight`
+  - The parachute animation supports `ShouldUseCellDrawer=no` to remove the hard-coded requirement to use the owner's color palette, while inheriting the animation owner's current country
+  - New `NoAmmoWeapons` tag supporting multiple weapon types
+  - Fix an issue in Ares where vehicles would occasionally continue to fire and move even after the driver had been killed
+  - New weapon filter tag `CanTarget.DriverKilled`
+  - Ares' Chrono Prisons / Abductors Expansion
+  - Fix an issue where vehicles affected by warheads with `IsLocomotor=yes` would have their effects interrupted when deactivated or reactivated
+  - Fixed an issue where Engineers and Spies might not be able to enter target buildings properly when executing vanilla's attack script
 - **NetsuNegi**:
   - Forbidding parallel AI queues by type
   - Jumpjet crash speed fix when crashing onto building
@@ -517,7 +531,6 @@ This page lists all the individual contributions to the project by their author.
   - Fix the issue that units will goto farest location if target is closer than `MinimumRange`
   - Fix a bug introduced by Ares where building types that have `UndeploysInto` cannot display `AltCameo` or `AltCameoPCX` even when you infiltrate enemy buildings with `Factory=UnitType`
   - Fix a bug where units can be promoted when created via trigger actions even if they have `Trainable=false`
-  - Fix the bug that ai will try to product aircraft even the airport has no free dock for it
   - Allow techno type considered as other type when recruiting techno for teams
   - Fix the issue that technos cannot spawn survivors due to non-probabilistic reasons when the tech type was destroyed
   - Fix the bug that vehicle survivor can spawn on wrong position when transport has been destroyed
@@ -578,6 +591,13 @@ This page lists all the individual contributions to the project by their author.
   - Fix a bug that computer player record cannot be log normally in non English mode
   - Cloak Enhancement
   - Allow customize that whether `Temporal=yes` warhead will cause target building animation poweroff
+  - Observer can see IvanBomb that's attached by any house
+  - Customize `MissileSafetyAltitude` and whether missiles fly to the target or climb when losing target
+  - More convenient vanilla action script target specification
+  - Customize turn rate when jumpjet vehicle crashing
+  - Customize insignias palette
+  - Fix the bug that units keep attacking ground after target wall has been destroyed by adjacent damage/crush/wave damage
+  - Fix the bug that `NoQueueUpToEnter` will cause survivors will return to location where they entered transport after the transport has been destroyed
 - **Apollo** - Translucent SHP drawing patches
 - **ststl**:
   - Customizable `ShowTimer` priority of superweapons
@@ -599,6 +619,7 @@ This page lists all the individual contributions to the project by their author.
   - Initial effort on optimization for crates' random distribution
   - Customizable spawns queue
   - Initial spawns number
+  - Sidebar radar horizontal offset fix
 - **Fryone**:
   - Customizable ElectricBolt Arcs
   - Sound entry on unit's creation
@@ -689,6 +710,7 @@ This page lists all the individual contributions to the project by their author.
   - Fix the bug that `DeploysInto` and `UndeploysInto` will make damaged techno lose 1 health
   - RA1-Style multi-turret and multi-barrel
   - Fix the issue of Ares' EMP not suspending the production of AI factories
+  - Attach effect when weapon fire
 - **Noble Fish**:
   - Documentation maintenance
   - Chinese documentation maintenance and translation
@@ -765,6 +787,15 @@ This page lists all the individual contributions to the project by their author.
   - Fix the bug that setting `WalkRate=0` on a TechnoType crashed the game (integer divide-by-zero) the moment an object of that type started moving
   - Fix the bug where `Ranged=true` causes projectiles using the new Trajectory to ignore settings such as `BounceTimes`
   - Customizable infantry sequence rates
+  - Fix the Spotlight-transport interaction bug caused by the incorrect reference removal fix
+  - Fix the issue that *Customizable crew type per country* not considering parsing order caused game parsing failure and a warning in the log
+  - Customize `IdleActionFrequency`
+  - Customize `MissileSafetyAltitude` and whether missiles fly to the target or climb when losing target
+  - Customize `DefaultToGuardArea` per gunner mode
+  - Global default value for `ShouldUseCellDrawer`
+  - Fix the Phobos bug where infantry and aircraft with `Locomotor=Tunnel` crash as soon as they move
+  - Fix the bug where the fix for airborne objects triggering sinking misjudged units with `Locomotor=Hover`
+  - Fix `HealBase` crates causing full-health objects to scatter
 - **Ollerus**:
   - Build limit group enhancement
   - Customizable rocker amplitude
@@ -800,6 +831,7 @@ This page lists all the individual contributions to the project by their author.
   - `513` Set mission timer properties
   - `RANGE`, `CRITIMMUNE` and `CRITCHANCE` promotion abilities
   - Fix several shield respawn/self heal issues
+  - Country-based attached effects
 - **NaotoYuuki** - Vertical & meteor trajectory projectile prototypes
 - **handama**:
   - AI script action to `16005 Jump Back To Previous Script`
@@ -912,10 +944,14 @@ This page lists all the individual contributions to the project by their author.
   - Add veterancy-based target filtering for weapons and warheads
   - Recipient-specific message and EVA on superweapon activation
   - Add new AutoDeath conditions based on the owner's power status and the player's credits
+  - Customize insignias palette
 - **tyuah8**:
   - Drive/Jumpjet/Ship/Teleport locomotor did not power on when it is un-piggybacked bugfix
   - Destroyed unit leaves sensors bugfix
-- **FrozenFog** - Hotkey for deselect object from current selection
+- **FrozenFog**:
+  - Hotkey for deselect object from current selection
+  - Hotkey for cycling through the current selection
+  - Hotkey for cycling through the types in the current selection
 - **Aephiex** - initial fix for Ares academy not working on the initial payloads of vehicles built from a war factory
 - **Multfinite** - Allow to toggle main exception handler via command line argument `-ExceptionHandler=boolean`
 - **hejiajun107, Xkein** - Fix a jumpjet crash related to voxel shadow drawing
@@ -950,6 +986,9 @@ This page lists all the individual contributions to the project by their author.
 - **Damfoos** - extensive and thorough testing
 - **Dmitry Volkov** - extensive and thorough testing
 - **Rise of the East community** - extensive playtesting of in-dev features
+- **Sovietianqi**:
+  - Fix the issue where Ares' `Flash.Duration` cannot override the weapon's repair flash effect
+  - Customizable crew type per country
 - **11EJDE11**:
   - Prevent mpdebug number from being drawn when visibility toggled off
   - Keep Syringe open until the game exits (ported from Vinifera)
@@ -965,3 +1004,7 @@ This page lists all the individual contributions to the project by their author.
 - **Nuke** - Reload speed adjustment on promotion
 - **frg2089 (舰队的偶像-岛风酱!)** - Fix `Slaved.OwnerWhenMasterKilled` not being respected when the master is sold or self-destructed
 - **weiyongxuan** - Extended `CanTargetHouses` to allow targeting neutral houses
+- **dh381-1**:
+  - Detonate ivan bomb on impact
+  - Allow Ares Academy add country-level filters
+- **Krisztiaan** - Fix mission restart crashes caused by freeing cached TerrainType SHP images

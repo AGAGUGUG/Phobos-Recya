@@ -29,8 +29,6 @@ void UnitExt::Serialize(T& Stm)
 		.Process(this->DeployFireTimer)
 		.Process(this->KeepTargetOnMove)
 		.Process(this->SimpleDeployerAnimationTimer)
-		.Process(this->IsBurrowed)
-		.Process(this->UndergroundTracked)
 		.Process(this->ExtraTurretRecoil)
 		.Process(this->ExtraBarrelRecoil)
 		;
@@ -196,6 +194,9 @@ bool UnitExt::CannotMove(UnitClass* pThis)
 {
 	if (pThis->LocomotorSource)
 		return false;
+
+	if (TechnoExt::DriverKilled(pThis))
+		return true;
 
 	const auto pType = pThis->Type;
 

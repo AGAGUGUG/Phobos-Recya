@@ -3,9 +3,13 @@
 #include <Kamikaze.h>
 #include <JumpjetLocomotionClass.h>
 
+#include <Ext/Aircraft/Body.h>
 #include <Ext/Anim/Body.h>
+#include <Ext/BulletType/Body.h>
 #include <Ext/House/Body.h>
 #include <Ext/Scenario/Body.h>
+#include <Ext/Unit/Body.h>
+#include <Ext/WeaponType/Body.h>
 #include <Misc/FlyingStrings.h>
 #include <Utilities/AresFunctions.h>
 
@@ -171,6 +175,8 @@ void FootExt::Serialize(T& Stm)
 		.Process(this->LastWarpDistance)
 		.Process(this->JumpjetSpeed)
 		.Process(this->IsInTunnel)
+		.Process(this->IsBurrowed)
+		.Process(this->UndergroundTracked)
 		.Process(this->OriginalPassengerOwner)
 		.Process(this->HasRemainingWarpInDelay)
 		.Process(this->LastWarpInDelay)

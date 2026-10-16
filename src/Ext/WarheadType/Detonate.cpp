@@ -159,9 +159,13 @@ void WarheadTypeExt::Detonate(TechnoClass* pOwner, HouseClass* pHouse, BulletExt
 	}
 
 	this->Crit_Active = false;
+
+	if (!this->ApplyPerTargetEffectsOnDetonate.Get(RulesExt::Global()->ApplyPerTargetEffectsOnDetonate))
+		return;
+
 	this->Crit_CurrentChance = this->GetCritChance(pOwner);
 
-	if ((this->PossibleCellSpreadDetonate || this->Crit_CurrentChance > 0.0) && this->ApplyPerTargetEffectsOnDetonate.Get(RulesExt::Global()->ApplyPerTargetEffectsOnDetonate))
+	if (this->PossibleCellSpreadDetonate || this->Crit_CurrentChance > 0.0)
 	{
 		if (!this->Crit_ApplyChancePerTarget.Get(RulesExt::Global()->Crit_ApplyChancePerTarget))
 			this->Crit_RandomBuffer = ScenarioClass::Instance->Random.RandomDouble();
@@ -265,7 +269,7 @@ void WarheadTypeExt::Detonate(TechnoClass* pOwner, HouseClass* pHouse, BulletExt
 
 void WarheadTypeExt::DetonateOnOneUnit(HouseClass* pHouse, TechnoClass* pTarget, const CoordStruct& coords, int damage, TechnoClass* pOwner, BulletExt* pBulletExt, bool bulletWasIntercepted, int distance)
 {
-	if (!pTarget || pTarget->InLimbo || !pTarget->IsAlive || !pTarget->Health || pTarget->IsSinking || pTarget->BeingWarpedOut)
+	if (!pTarget || pTarget->InLimbo || !pTarget->IsAlive || pTarget->Health <= 0 || pTarget->IsSinking || pTarget->IsBeingWarpedOut())
 		return;
 
 	if (!this->CanTargetHouse(pHouse, pTarget) || !this->CanAffectTarget(pTarget))
@@ -304,7 +308,7 @@ void WarheadTypeExt::DetonateOnOneUnit(HouseClass* pHouse, TechnoClass* pTarget,
 	if (this->PenetratesTransport_Level > 0 && damage)
 		this->ApplyPenetratesTransport(pTarget, pOwner, pHouse, coords, damage, distance);
 
-	if (this->Taunt && pOwner)
+	if (this->Taunt && pOwner && !TechnoExt::DriverKilled(pTarget))
 		pTarget->Override_Mission(Mission::Attack, pOwner, nullptr);
 
 	// Apply knockup and traction effects
@@ -314,6 +318,9 @@ void WarheadTypeExt::DetonateOnOneUnit(HouseClass* pHouse, TechnoClass* pTarget,
 	if (this->Traction)
 		this->ApplyTraction(pTarget, coords);
 
+	if (this->IvanBomb_Detonate)
+		this->IvanBombDetonate(pOwner, pTarget);
+
 	// This might change the target's armor type
 	this->ApplyShieldModifiers(pTarget);
 
@@ -322,8 +329,11 @@ void WarheadTypeExt::DetonateOnOneUnit(HouseClass* pHouse, TechnoClass* pTarget,
 		this->ApplyAttachEffects(pTarget, pHouse, pOwner);
 
 	// Put Crit at last since it might kill the target
-	if (this->Crit_CurrentChance > 0.0 && (!this->Crit_SuppressWhenIntercepted.Get(RulesExt::Global()->Crit_SuppressWhenIntercepted) || !bulletWasIntercepted))
+	if (this->Crit_CurrentChance > 0.0 && (!this->Crit_SuppressWhenIntercepted.Get(RulesExt::Global()->Crit_SuppressWhenIntercepted)
+		|| !this->ApplyPerTargetEffectsOnDetonate.Get(RulesExt::Global()->ApplyPerTargetEffectsOnDetonate) || !bulletWasIntercepted))
+	{
 		this->ApplyCrit(pHouse, pTarget, pOwner, pBulletExt);
+	}
 
 	if (this->Attachment_Transform.size() > 0)
 		this->ApplyAttachmentTransform(pHouse, pTarget);
@@ -841,6 +851,9 @@ void WarheadTypeExt::ApplyAttachEffects(TechnoClass* pTarget, HouseClass* pInvok
 
 double WarheadTypeExt::GetCritChance(TechnoClass* pFirer) const
 {
+	if (!this->CanCrit)
+		return 0.0;
+
 	double critChance = this->Crit_Chance;
 
 	if (!pFirer)
@@ -1259,4 +1272,46 @@ void WarheadTypeExt::ExtData::ApplyAmmoModifier(TechnoClass* pTarget)
 
 	newCurrentAmmo = newCurrentAmmo < 0 ? 0 : newCurrentAmmo;
 	pTarget->Ammo = newCurrentAmmo > maxAmmo ? maxAmmo : newCurrentAmmo;
+}
+
+void WarheadTypeExt::ExtData::IvanBombDetonate(TechnoClass* pOwner, TechnoClass* pTarget)
+{
+	const auto& affectTypes = this->IvanBomb_Detonate_AffectTypes;
+	const bool sameInvokerOnly = this->IvanBomb_Detonate_SameInvokerOnly;
+
+	auto needsDetonate = [&](BombClass* pBomb)
+	{
+		// TODO: handle the case when the owner of IvanBomb is dead
+		if (pBomb && (affectTypes.empty() || (pBomb->Owner && affectTypes.Contains(pBomb->Owner->GetTechnoType()))))
+		{
+			if (!sameInvokerOnly || (pOwner && pBomb->Owner == pOwner))
+				pBomb->DetonationFrame = Unsorted::CurrentFrame;
+		}
+	};
+
+	needsDetonate(pTarget->AttachedBomb);
+
+	if (this->IvanBomb_Detonate_PenetratesTransport)
+	{
+		for (auto pPassenger = pTarget->Passengers.GetFirstPassenger(); pPassenger; pPassenger = abstract_cast<FootClass*>(pPassenger->NextObject))
+		{
+			needsDetonate(pPassenger->AttachedBomb);
+		}
+	}
+
+	if (this->IvanBomb_Detonate_PenetratesGarrison && pTarget->WhatAmI() == AbstractType::Building)
+	{
+		const auto pTargetBuilding = static_cast<BuildingClass*>(pTarget);
+
+		for (const auto pOccupant : pTargetBuilding->Occupants)
+		{
+			needsDetonate(pOccupant->AttachedBomb);
+		}
+	}
+
+	if (this->IvanBomb_Detonate_AffectsParasite && (pTarget->AbstractFlags & AbstractFlags::Foot) != AbstractFlags::None)
+	{
+		if (const auto pParasite = static_cast<FootClass*>(pTarget)->ParasiteEatingMe)
+			needsDetonate(pParasite->AttachedBomb);
+	}
 }

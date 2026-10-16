@@ -90,10 +90,9 @@ DEFINE_FUNCTION_JUMP(VTABLE, 0x7F5D64, UnitClass_ClearOccupyBit_Reimpl);
 
 // TODO ^ same for TA for non-UnitClass, not needed so cba for now
 
-DEFINE_HOOK(0x480EA8, CellClass_DamageWall_AdjacentWallDamage, 0x7)
+DEFINE_HOOK(0x480EA8, CellClass_DamageWall_AdjacentWallDamage, 0x5)
 {
-	enum{ SkipGameCode = 0x480EB4 };
-
+	enum { SkipGameCode = 0x480EB4 };
 	GET(CellClass*, pThis, EAX);
 
 	pThis->DamageWall(RulesExt::Global()->AdjacentWallDamage);

@@ -78,6 +78,7 @@ public:
 	Valueable<double> Crit_AffectsBelowPercent;
 	Valueable<double> Crit_AffectsAbovePercent;
 	Nullable<bool> Crit_SuppressWhenIntercepted;
+	bool CanCrit;
 
 	Valueable<WarheadTypeClass*> ReturnWarhead;
 	Valueable<int> ReturnWarhead_Damage;
@@ -163,7 +164,7 @@ public:
 	ValueableVector<TechnoTypeClass*> DetonateOnAllMapObjects_IgnoreTypes;
 
 	std::vector<AttachmentTransformGroup> Attachment_Transform;
-	std::vector<TypeConvertGroup> Convert_Pairs;
+	TypeConvertGroupList Convert_Pairs;
 	AEAttachInfoTypeClass AttachEffects;
 
 	Valueable<bool> InflictLocomotor;
@@ -309,6 +310,13 @@ public:
 
 	Valueable<int> Ammo;
 
+	Valueable<bool> IvanBomb_Detonate;
+	Valueable<bool> IvanBomb_Detonate_SameInvokerOnly;
+	Valueable<bool> IvanBomb_Detonate_PenetratesTransport;
+	Valueable<bool> IvanBomb_Detonate_PenetratesGarrison;
+	Valueable<bool> IvanBomb_Detonate_AffectsParasite;
+	ValueableVector<TechnoTypeClass*> IvanBomb_Detonate_AffectTypes;
+
 	// Ares tags
 	// http://ares-developers.github.io/Ares-docs/new/warheads/general.html
 	Valueable<bool> AffectsEnemies;
@@ -395,6 +403,7 @@ public:
 		, Crit_AffectsBelowPercent { 1.0 }
 		, Crit_AffectsAbovePercent { 0.0 }
 		, Crit_SuppressWhenIntercepted {}
+		, CanCrit { false }
 
 		, ReturnWarhead {}
 		, ReturnWarhead_Damage { 0 }
@@ -648,6 +657,13 @@ public:
 		, PreventOccupantEscape { false }
 
 		, Ammo { 0 }
+
+		, IvanBomb_Detonate { false }
+		, IvanBomb_Detonate_SameInvokerOnly { true }
+		, IvanBomb_Detonate_PenetratesTransport { false }
+		, IvanBomb_Detonate_PenetratesGarrison { false }
+		, IvanBomb_Detonate_AffectsParasite { false }
+		, IvanBomb_Detonate_AffectTypes {}
 	{ }
 
 	void ApplyAttachmentTransform(HouseClass* pHouse, TechnoClass* pTarget);
@@ -679,6 +695,7 @@ public:
 	void DetonateOnOneUnit(HouseClass* pHouse, TechnoClass* pTarget, const CoordStruct& coords, int damage, TechnoClass* pOwner, BulletExt* pBulletExt, bool bulletWasIntercepted = false, int distance = -1);
 	void InterceptBullets(TechnoClass* pOwner, BulletClass* pInterceptor, const CoordStruct& coords);
 	DamageAreaResult DamageAreaWithTarget(const CoordStruct& coords, int damage, TechnoClass* pSource, WarheadTypeClass* pWH, bool affectsTiberium, HouseClass* pSourceHouse, TechnoClass* pTarget);
+	double GetCritChance(TechnoClass* pFirer) const;
 private:
 	void ApplyRemoveDisguise(TechnoClass* pTarget);
 	HouseClass* ApplyRemoveMindControl(HouseClass* pHouse, TechnoClass* pTarget);
@@ -692,8 +709,8 @@ private:
 	void ApplyPenetratesTransport(TechnoClass* pTarget, TechnoClass* pInvoker, HouseClass* pInvokerHouse, const CoordStruct& coords, int damage, int distance);
 	void ApplyKnockUp(TechnoClass* pTarget);
 	void ApplyTraction(TechnoClass* pTarget, const CoordStruct& coords);
-	double GetCritChance(TechnoClass* pFirer) const;
 	void ApplyAmmoModifier(TechnoClass* pTarget);
+	void IvanBombDetonate(TechnoClass* pOwner, TechnoClass* pTarget);
 
 public:
 	class ExtContainer final : public Container<WarheadTypeExt>

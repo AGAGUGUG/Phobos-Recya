@@ -18,6 +18,15 @@ void HouseTypeExt::LoadFromINIFile(CCINIClass* pINI)
 	INI_EX exINI(pINI);
 
 	this->EVATag.Read(pINI, pSection, "EVA.Tag");
+
+	this->AttachEffects.LoadFromINI(pINI, pSection);
+	this->AttachEffects_AttachOnOwnerChange.Read(exINI, pSection, "AttachEffect.AttachOnOwnerChange");
+
+	this->Crew.Read<true>(exINI, pSection, "Crew");
+
+	this->RevealHouses.Read<false, true>(exINI, pSection, "RevealHouses");
+
+	this->Academy_AllowCountryFilter.Read(exINI, pSection, "Academy.AllowCountryFilter");
 }
 
 template <typename T>
@@ -25,6 +34,11 @@ void HouseTypeExt::Serialize(T& Stm)
 {
 	Stm
 		.Process(this->EVATag)
+		.Process(this->AttachEffects)
+		.Process(this->AttachEffects_AttachOnOwnerChange)
+		.Process(this->Crew)
+		.Process(this->RevealHouses)
+		.Process(this->Academy_AllowCountryFilter)
 		;
 }
 

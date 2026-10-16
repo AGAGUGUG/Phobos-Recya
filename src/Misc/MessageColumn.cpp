@@ -60,7 +60,7 @@ bool MessageToggleClass::Action(GadgetFlag flags, DWORD* pKey, KeyModifier modif
 
 void MessageToggleClass::DrawShape() const
 {
-	if (this->Disabled)
+	if (this->Disabled || ScenarioClass::Instance->UserInputLocked)
 		return;
 
 	RectangleStruct drawRect { this->X, this->Y, this->Width, this->Height };
@@ -167,7 +167,7 @@ bool MessageButtonClass::Action(GadgetFlag flags, DWORD* pKey, KeyModifier modif
 
 void MessageButtonClass::DrawShape() const
 {
-	if (this->Disabled)
+	if (this->Disabled || ScenarioClass::Instance->UserInputLocked)
 		return;
 
 	constexpr int intervalX = 5;
@@ -302,7 +302,7 @@ void MessageScrollClass::DrawShape() const
 	}
 	else // Scroll_Bar
 	{
-		if (!this->Disabled)
+		if (!this->Disabled && !ScenarioClass::Instance->UserInputLocked)
 		{
 			constexpr int offset = 1;
 			RectangleStruct drawRect { this->X + offset, this->Y, this->Width - (offset * 2), this->Height };
@@ -1161,6 +1161,9 @@ DEFINE_HOOK(0x55DDA0, MainLoop_FrameStep_NewMessageListManage, 0x5)
 	enum { SkipGameCode = 0x55DDAA };
 
 	UIExt::UIRoot::Instance().UpdateAndDraw();
+
+	if (ScenarioClass::Instance->UserInputLocked && MessageColumnClass::Instance.IsExpanded())
+		MessageColumnClass::Instance.PackUp();
 
 	if (!MessageTemp::OnOldMessages)
 		MessageListClass::Instance.Manage();
