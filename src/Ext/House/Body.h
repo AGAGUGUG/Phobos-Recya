@@ -137,6 +137,10 @@ public:
 		, PlayerAutoRepair { true }
 		, BeaconsPlacedOrder { 0, 0, 0 }
 		, Academies {}
+		, OwnedDeployingUnits {}
+		, Common {}
+		, Combat {}
+		, LastRefineryBuildFrame { -1 }
 	{ }
 
 	bool OwnsLimboDeliveredBuilding(BuildingClass* pBuilding) const;
