@@ -177,10 +177,6 @@ public:
 	Valueable<int> SetAmbientBlue;
 	Valueable<bool> ReduceTiberium;
 
-#ifdef LOCO_TEST_WARHEADS // Enable warheads parsing
-	Valueable<bool> InflictLocomotor;
-	Valueable<bool> RemoveInflictedLocomotor;
-#endif
 	Nullable<ParticleSystemTypeClass*> Parasite_ParticleSystem;
 	Nullable<bool> Parasite_DisableParticleSystem;
 	Valueable<AffectedTarget> Parasite_CullingTarget;
@@ -502,10 +498,6 @@ public:
 		, SetAmbientBlue { -1 }
 		, ReduceTiberium { false }
 
-#ifdef LOCO_TEST_WARHEADS // Enable warheads parsing
-		, InflictLocomotor { false }
-		, RemoveInflictedLocomotor { false }
-#endif
 		, Parasite_ParticleSystem {}
 		, Parasite_DisableParticleSystem {}
 		, Parasite_CullingTarget { AffectedTarget::Infantry }

@@ -52,7 +52,7 @@ namespace Ext
 		template<typename Ret, class... TArgs>
 		Ret Call(TArgs&&... Args)
 		{
-			return ((Ret(*)(TArgs))GetFunc())(std::forward(Args));
+			return ((Ret(*)(TArgs...))GetFunc())(std::forward<TArgs>(Args)...);
 		}
 	};
 

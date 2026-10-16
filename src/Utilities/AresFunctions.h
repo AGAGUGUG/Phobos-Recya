@@ -63,7 +63,6 @@ public:
 	static void(__thiscall* AddPassengerFromTunnel)(void*, BuildingClass*, FootClass*);
 
 	// HouseExt
-	static bool(__thiscall* ReverseEngineer)(void*, TechnoTypeClass* pType);
 	static InfantryTypeClass* (__thiscall* GetCrew)(void*);
 
 	// VoxClass
