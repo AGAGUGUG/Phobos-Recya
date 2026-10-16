@@ -231,6 +231,7 @@ void RulesExt::ExtData::LoadBeforeTypeData(RulesClass* pThis, CCINIClass* pINI)
 
 	this->CheckExtraBaseNormal.Read(exINI, GameStrings::General, "CheckExtraBaseNormal");
 	this->Cameo_AlwaysExist.Read(exINI, GameStrings::AudioVisual, "Cameo.AlwaysExist");
+	this->Cameo_AlwaysExistAllowQueue.Read(exINI, GameStrings::AudioVisual, "Cameo.AlwaysExistAllowQueue");
 	this->Cameo_OverlayShapes.Read(exINI, GameStrings::AudioVisual, "Cameo.OverlayShapes");
 	this->Cameo_OverlayFrames.Read(exINI, GameStrings::AudioVisual, "Cameo.OverlayFrames");
 	this->Cameo_OverlayPalette.LoadFromINI(pINI, GameStrings::AudioVisual, "Cameo.OverlayPalette");
@@ -1003,6 +1004,7 @@ void RulesExt::ExtData::Serialize(T& Stm)
 		.Process(this->NoQueueUpToUnload_Buildings)
 		.Process(this->CheckExtraBaseNormal)
 		.Process(this->Cameo_AlwaysExist)
+		.Process(this->Cameo_AlwaysExistAllowQueue)
 		.Process(this->Cameo_OverlayShapes)
 		.Process(this->Cameo_OverlayFrames)
 		.Process(this->Cameo_OverlayPalette)

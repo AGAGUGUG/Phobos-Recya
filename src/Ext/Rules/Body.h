@@ -134,6 +134,7 @@ public:
 
 		Valueable<bool> CheckExtraBaseNormal;
 		Valueable<bool> Cameo_AlwaysExist;
+		Valueable<bool> Cameo_AlwaysExistAllowQueue;
 		Valueable<SHPStruct*> Cameo_OverlayShapes;
 		ValueableVector<int> Cameo_OverlayFrames;
 		CustomPalette Cameo_OverlayPalette;
@@ -824,6 +825,7 @@ public:
 
 			, CheckExtraBaseNormal { false }
 			, Cameo_AlwaysExist { false }
+			, Cameo_AlwaysExistAllowQueue { true }
 			, Cameo_OverlayShapes { FileSystem::PIPS_SHP }
 			, Cameo_OverlayFrames {}
 			, Cameo_OverlayPalette {}

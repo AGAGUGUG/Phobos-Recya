@@ -814,6 +814,13 @@ DEFINE_HOOK(0x6AA88D, StripClass_RecheckCameo_FindFactoryDehardCode, 0x6)
 // limits (BuildLimitGroup / vanilla BuildLimit / aircraft docks) must still
 // refuse orders, otherwise they can be pre-ordered indefinitely and get stuck
 // at 0% progress in the factory queue.
+// Whether clicking a greyed-out cameo is allowed to queue the item anyway
+// (pre-ordering); read from [AudioVisual] -> Cameo.AlwaysExistAllowQueue.
+static bool AllowGreyCameoQueue()
+{
+	return RulesExt::Global()->Cameo_AlwaysExistAllowQueue;
+}
+
 static bool IsBlockedByBuildLimit(HouseClass* const pHouse, const TechnoTypeClass* const pType)
 {
 	// Mix BuildLimitGroup - the same check the sidebar greying uses.
@@ -876,7 +883,7 @@ DEFINE_HOOK(0x6AB6F5, SelectClass_Action_CheckBuildable, 0x6)
 
 	GET(TechnoTypeClass* const, pType, EDI);
 
-	if (!TechnoTypeExt::Fetch(pType)->Cameo_AlwaysExist.Get(RulesExt::Global()->Cameo_AlwaysExist))
+	if (!TechnoTypeExt::Fetch(pType)->Cameo_AlwaysExist.Get(RulesExt::Global()->Cameo_AlwaysExist) || !AllowGreyCameoQueue())
 		return ShouldNotBuild;
 
 	if (IsBlockedByBuildLimit(HouseClass::CurrentPlayer, pType))
@@ -887,7 +894,7 @@ DEFINE_HOOK(0x6AB6F5, SelectClass_Action_CheckBuildable, 0x6)
 
 static bool __fastcall HouseClass_ShouldDisableCameo_Check(HouseClass* pThis, void* _, TechnoTypeClass* pType)
 {
-	if (TechnoTypeExt::Fetch(pType)->Cameo_AlwaysExist.Get(RulesExt::Global()->Cameo_AlwaysExist))
+	if (TechnoTypeExt::Fetch(pType)->Cameo_AlwaysExist.Get(RulesExt::Global()->Cameo_AlwaysExist) && AllowGreyCameoQueue())
 		return false;
 
 	return pThis->ShouldDisableCameo(pType);
@@ -896,7 +903,7 @@ DEFINE_FUNCTION_JUMP(CALL, 0x4C9CEA, HouseClass_ShouldDisableCameo_Check);
 
 static BOOL __fastcall TechnoTypeClass_FindFactory_Check(TechnoTypeClass* pThis, void* _, bool allowOccupied, bool requirePower, bool requireCanBuild, HouseClass* pHouse)
 {
-	if (TechnoTypeExt::Fetch(pThis)->Cameo_AlwaysExist.Get(RulesExt::Global()->Cameo_AlwaysExist))
+	if (TechnoTypeExt::Fetch(pThis)->Cameo_AlwaysExist.Get(RulesExt::Global()->Cameo_AlwaysExist) && AllowGreyCameoQueue())
 		return 1;
 
 	return pThis->FindFactory(allowOccupied, requirePower, requireCanBuild, pHouse) ? 1 : 0;
@@ -909,7 +916,7 @@ DEFINE_HOOK(0x4FA6BB, HouseClass_BeginProduction_Check, 0x9)
 
 	GET(TechnoTypeClass* const, pType, EBP);
 
-	if (!TechnoTypeExt::Fetch(pType)->Cameo_AlwaysExist.Get(RulesExt::Global()->Cameo_AlwaysExist))
+	if (!TechnoTypeExt::Fetch(pType)->Cameo_AlwaysExist.Get(RulesExt::Global()->Cameo_AlwaysExist) || !AllowGreyCameoQueue())
 		return 0;
 
 	GET(FactoryClass* const, pFactory, ESI);
@@ -928,7 +935,7 @@ DEFINE_HOOK(0x4C9D6E, FactoryClass_QueueProduction_CheckBuildable, 0x8)
 	GET(TechnoTypeClass*, pType, EDI);
 	GET_STACK(HouseClass* const, pHouse, STACK_OFFSET(0x14, 0x8));
 
-	if (!pHouse->IsControlledByHuman() || !TechnoTypeExt::Fetch(pType)->Cameo_AlwaysExist.Get(RulesExt::Global()->Cameo_AlwaysExist))
+	if (!pHouse->IsControlledByHuman() || !TechnoTypeExt::Fetch(pType)->Cameo_AlwaysExist.Get(RulesExt::Global()->Cameo_AlwaysExist) || !AllowGreyCameoQueue())
 		return 0;
 
 	auto& globalCount = ScenarioExt::Global()->CanBuildNowCount;
