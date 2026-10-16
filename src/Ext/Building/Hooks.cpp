@@ -852,20 +852,49 @@ static bool IsBlockedByBuildLimit(HouseClass* const pHouse, const TechnoTypeClas
 		}
 	}
 
-	// Airport-bound aircraft: docks occupied by present or queued aircraft.
+	// Airport-bound aircraft: docks provided by owned aircraft factories
+	// (NumberOfDocks on the building type), occupied by present aircraft and
+	// reserved by queued ones.
 	if (pType->WhatAmI() == AbstractType::AircraftType && static_cast<const AircraftTypeClass*>(pType)->AirportBound)
 	{
+		int totalDocks = 0;
 		int docksUsed = 0;
 
-		for (const auto& pPadType : RulesClass::Instance->PadAircraft)
+		for (const auto pBuilding : BuildingClass::Array)
 		{
-			docksUsed += pHouse->CountOwnedAndPresent(pPadType);
+			if (!pBuilding || pBuilding->Owner != pHouse || pBuilding->InLimbo || !pBuilding->IsAlive)
+				continue;
 
-			if (const auto pFactory = pHouse->Primary_ForAircraft)
-				docksUsed += pFactory->CountTotal(pPadType);
+			const auto pBldType = pBuilding->Type;
+
+			if (pBldType->NumberOfDocks <= 0 || pBldType->Factory != AbstractType::AircraftType)
+				continue;
+
+			totalDocks += pBldType->NumberOfDocks;
+
+			if (const auto pFactory = pBuilding->Factory)
+			{
+				for (const auto pQueuedType : pFactory->QueuedObjects)
+				{
+					if (pQueuedType && pQueuedType->WhatAmI() == AbstractType::AircraftType
+						&& static_cast<AircraftTypeClass*>(pQueuedType)->AirportBound)
+					{
+						++docksUsed;
+					}
+				}
+			}
 		}
 
-		if (docksUsed >= pHouse->AirportDocks)
+		for (const auto pAircraft : AircraftClass::Array)
+		{
+			if (pAircraft && pAircraft->Owner == pHouse && pAircraft->Type->AirportBound
+				&& !pAircraft->InLimbo && pAircraft->IsAlive)
+			{
+				++docksUsed;
+			}
+		}
+
+		if (docksUsed >= totalDocks)
 			return true;
 	}
 
