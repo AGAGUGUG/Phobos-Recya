@@ -1093,7 +1093,20 @@ DEFINE_HOOK(0x4D19A6, FoggedObjectClass_DrawFoggedObjects_DrawBuildingAlphaImage
 	if (pFog->FoggedType != 6)
 		return 0;
 
-	const auto pType = pFog->BuildingType;
+	// 注意：+0x28 并非 BuildingType 指针（原版建筑分支以 BuildingClass 级别的 +0x16054
+	// 大偏移使用它），建筑类型应从段向量 [fog+0x60] 的第一个条目（BuildingClass*）经
+	// YRpp 类型安全地获取。
+	const auto pVector = *reinterpret_cast<void* const*>(reinterpret_cast<const char*>(pFog) + 0x60);
+
+	if (!pVector)
+		return 0;
+
+	const auto pBuilding = *reinterpret_cast<BuildingClass* const*>(pVector);
+
+	if (!pBuilding)
+		return 0;
+
+	const auto pType = pBuilding->Type;
 
 	if (!pType)
 		return 0;
