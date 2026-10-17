@@ -631,7 +631,17 @@ DEFINE_HOOK(0x4A9CA0, DisplayClass_RevealFogShroud_Reimplement, 0x8)
 	}
 
 	if (pCell->Foggedness == -1)
+	{
 		pCell->Flags |= CellFlags::CenterRevealed;
+
+		// 修复：完全可见的格子不应保留 Fogged 标记。间谍卫星揭幕后格子带有
+		// EdgeRevealed，而 CleanFog 只在格子“新变为 EdgeRevealed”时触发；此后
+		// FogCell（迷雾扩散/下坡遮挡）会重新给这些格子打上 Fogged 却不更新
+		// Foggedness，形成“逻辑迷雾/视觉无雾”的错位——单位走入后被当作处于
+		// 迷雾中（不绘制且被取消选中）。凡视野更新到完全可见的格子即清理。
+		if (pCell->Flags & CellFlags::Fogged)
+			pCell->CleanFog();
+	}
 
 	if (shouldRedraw)
 		TacticalClass::Instance->RegisterCellAsVisible(pCell);
@@ -874,13 +884,18 @@ DEFINE_HOOK(0x4FC200, HouseClass_AcceptDefeat_RevealFog, 0x5)
 // 真实物体而消失。按选定行为，揭示时连同迷雾一并彻底清除。
 // 注意除了下述标记外，还必须重置格子的 Visibility/Foggedness（绘制与选中管线
 // 依据这两个字段判断格子是否可见），未探索过的格子中它们是“完全遮挡”值。
-DEFINE_HOOK(0x577EE3, DisplayClass_RevealWholeMap_ClearFog, 0x6)
+// 钩点改在 0x577EE9（下一格迭代调用处，含被原版跳过的 3 个特殊格子）：
+// 这些格子若保留 !CenterRevealed&&EdgeRevealed 状态，会成为迷雾扩散的种子，
+// 从它们出发逐圈重新迷雾整张地图并经 FogCell 打回 Fogged 标记。此处对全部
+// 格子（含特殊格子）补齐 CenterRevealed|EdgeRevealed 并清理迷雾状态，黑幕
+// 的跳过逻辑（ShroudCounter/Gaps 不动）保持原版行为不变。
+DEFINE_HOOK(0x577EE9, DisplayClass_RevealWholeMap_ClearFog, 0x5)
 {
 	GET(CellClass* const, pCell, EAX);
 
 	if (ScenarioClass::Instance->SpecialFlags.FogOfWar)
 	{
-		pCell->Flags &= ~CellFlags::Fogged;
+		pCell->Flags = (pCell->Flags & ~CellFlags::Fogged) | CellFlags::CenterRevealed | CellFlags::EdgeRevealed;
 		pCell->Visibility = -1;
 		pCell->Foggedness = -1;
 		pCell->ClearFoggedObjects();
