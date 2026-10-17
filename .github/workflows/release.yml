@@ -37,9 +37,6 @@ jobs:
         files: |
           ${{ env.BUILD_CONFIGURATION }}/Phobos.dll
           ${{ env.BUILD_CONFIGURATION }}/Phobos.pdb
-          ${{ env.BUILD_CONFIGURATION }}/gamemd.edb
-          ${{ env.BUILD_CONFIGURATION }}/Syringe.exe
-          ${{ env.BUILD_CONFIGURATION }}/Syringe.LICENSE.txt
 
   # Generates the release body (the author's text plus the changelog) in parallel with the build.
   changelog:
