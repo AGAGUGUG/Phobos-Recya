@@ -484,6 +484,8 @@ public:
 
 		Valueable<int> SmudgeUpdateTime;
 
+		Valueable<int> FogSpreadRate;
+
 		Valueable<int> AIAdjacentMax;
 		Nullable<int> AIAdjacentMax_Campaign;
 
@@ -1138,6 +1140,8 @@ public:
 			, InvisoBlockageFix { false }
 
 			, SmudgeUpdateTime { 0 }
+
+			, FogSpreadRate { 0 }
 
 			, AIAdjacentMax { -1 }
 			, AIAdjacentMax_Campaign {}

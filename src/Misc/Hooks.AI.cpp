@@ -43,10 +43,59 @@ static bool __forceinline ShouldRemoveSmudgeCell(const int index, const int time
 	return true;
 }
 
+#pragma region FogSpread
+
+namespace FogSpreadHelper
+{
+	std::vector<CellStruct> PendingCells;
+	const ScenarioClass* LastScenario = nullptr;
+
+	// 迷雾回填蔓延：原版的迷雾恢复是一次性的递归扩散（0x4ACC50 对自身置完全遮挡后，
+	// 沿遮挡为完全遮挡的邻居立即递归波及整片区域）。FogSpreadRate>0 时扩散前沿的格子
+	// 进入待处理队列，每帧从 Logic AI 尾部取出至多 FogSpreadRate 个格子交给原版扩散
+	// 函数处理，最终状态与原版完全一致，仅恢复过程放缓。
+	void ProcessQueue()
+	{
+		const int rate = RulesExt::Global()->FogSpreadRate;
+
+		if (rate <= 0 || PendingCells.empty())
+			return;
+
+		// 对局切换后丢弃上一局的残留队列
+		if (ScenarioClass::Instance != LastScenario)
+		{
+			LastScenario = ScenarioClass::Instance;
+			PendingCells.clear();
+			return;
+		}
+
+		const auto count = std::min<size_t>(static_cast<size_t>(rate), PendingCells.size());
+		const auto pTactical = TacticalClass::Instance;
+
+		for (size_t i = 0; i < count; ++i)
+		{
+			const auto coords = PendingCells.back();
+			PendingCells.pop_back();
+
+			if (const auto pCell = pTactical->TryGetCellAt(coords))
+			{
+				// 已被前序扩散处理的格子跳过（去重）
+				if (pCell->Foggedness != -2)
+					reinterpret_cast<void(__thiscall*)(TacticalClass*, const CellStruct*)>(0x4ACC50)(pTactical, &coords);
+			}
+		}
+	}
+}
+
+#pragma endregion
+
 DEFINE_HOOK(0x55B6B3, LogicClass_AI_After, 0x5)
 {
 	for (auto const& attachment : AttachmentClass::Array)
 		attachment->AI();
+
+	if (ScenarioClass::Instance->SpecialFlags.FogOfWar)
+		FogSpreadHelper::ProcessQueue();
 
 	const int time = RulesExt::Global()->SmudgeUpdateTime;
 
@@ -788,6 +837,25 @@ DEFINE_HOOK(0x4ACBC4, MapClass_FogSpread_SkipWithSpySat, 0x5)
 	}
 
 	return SpreadFogOfWar;
+}
+
+// 迷雾扩散的递归调用点：原版在此立即递归处理完全遮挡的邻居。FogSpreadRate>0 时
+// 改为入队等待逐帧处理（见 FogSpreadHelper::ProcessQueue），蔓延速率由此可控。
+// 注意该处 ESI 为邻居格子（0x4ACCFB 处取得），且仅在"邻居遮挡为完全遮挡且尚未
+// 处理"时到达（0x4ACD10/0x4ACD15 的两道检查已通过）。
+DEFINE_HOOK(0x4ACD1D, DisplayClass_SpreadFog_RateLimit, 0xC)
+{
+	enum { SkipRecursion = 0x4ACD29 };
+
+	GET(CellClass* const, pNeighbor, ESI);
+
+	if (RulesExt::Global()->FogSpreadRate > 0 && FogSpreadHelper::PendingCells.size() <= 200000u)
+	{
+		FogSpreadHelper::PendingCells.push_back(pNeighbor->MapCoords);
+		return SkipRecursion;
+	}
+
+	return 0; // 原版立即递归
 }
 
 // 让单位在更新视野的时候不会多更新一次之前的视野
