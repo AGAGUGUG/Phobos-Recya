@@ -1024,6 +1024,16 @@ DEFINE_HOOK(0x762C4E, WaveClass_UpdateWave_SkipInFog, 0x6)
 
 #pragma endregion
 
+// 修复迷雾中建筑绘制崩溃：原分支在绘制建筑遮挡时会使用 BUILDINGZ.SHA 的缓存指针
+// （FileSystem::BUILDINGZ_SHA），但该缓冲在进入游戏时已被释放，读取已释放内存导致崩溃。
+// 原版迷雾逻辑从不执行到此处，故原版不崩溃。将遮挡图参数置空以跳过遮挡绘制，
+// 与同分支的无遮挡子路径传 0 的行为一致，迷雾中的建筑不需要遮挡效果。
+DEFINE_HOOK(0x4D1E46, FoggedObjectClass_DrawFoggedObjects_NullBuildingZSHA, 0x7)
+{
+	R->EAX(0); // 原本存入 BUILDINGZ_SHA，改为空指针
+	return 0;
+}
+
 // 迷雾中的建筑被摧毁后，移除其冻结在迷雾中的贴图，防止残留
 DEFINE_HOOK(0x441F60, BuildingClass_AfterDestruction_RemoveFoggedImage, 0x5)
 {
