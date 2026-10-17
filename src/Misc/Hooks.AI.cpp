@@ -1078,29 +1078,16 @@ DEFINE_HOOK(0x4D1E46, FoggedObjectClass_DrawFoggedObjects_NullBuildingZSHA, 0x7)
 
 // 迷雾中建筑补画 AlphaImage 光效：正常状态的光效经 AlphaShapeClass 写入 alpha 亮度缓冲、
 // 由后续 blit 消费来呈现，而迷雾冻结贴图与迷雾层不消费该缓冲，导致雾中建筑丢失光效。
-// 在冻结贴图各段绘制完成后（0x4D2203 为建筑分支段循环的唯一出口），追加一次半透明
-// 光效贴图：以冻结位置为中心（BlitterFlags 含 Centered），被之后绘制的迷雾层罩住，
-// 与建筑本体一致地被雾调暗；帧号跟随当前时间循环，与正常光效的动画节奏一致。
-// 注意：0x4D2203 出口处 EBX 不保证仍指向迷雾对象（实测被循环内逻辑改写导致崩溃），
-// 故在分支入口 0x4D1C4D（此处 EBX 必为刚从全局列表取出的迷雾对象）捕获备用。
-static FoggedObjectHelper::FoggedObjectFields* s_CurrentBuildingFog = nullptr;
-
-DEFINE_HOOK(0x4D1C4D, FoggedObjectClass_DrawFoggedObjects_CaptureBuildingFog, 0x8)
+// 在建筑分支入口 0x4D1C4D（EBX=刚从全局列表取出的迷雾对象，EDI=裁剪边界，均已由原版
+// 代码立即使用，状态可靠）直接绘制光效贴图：以冻结位置为中心（BlitterFlags 含
+// Centered），先于建筑冻结段绘制（光效在建筑下方），再被之后绘制的迷雾层罩住，与建筑
+// 本体一致地被雾调暗；帧号跟随当前时间循环，与正常光效的动画节奏一致。
+// 注意：不在段循环出口（0x4D2203）绘制——出口处寄存器/流程在部分调用路径下不可靠
+// （实测两次崩溃），入口处状态则由原版代码当场使用、必然有效。
+DEFINE_HOOK(0x4D1C4D, FoggedObjectClass_DrawFoggedObjects_DrawBuildingAlphaImage, 0x8)
 {
 	GET(FoggedObjectHelper::FoggedObjectFields* const, pFog, EBX);
-
-	s_CurrentBuildingFog = pFog;
-	return 0;
-}
-
-DEFINE_HOOK(0x4D2203, FoggedObjectClass_DrawFoggedObjects_DrawBuildingAlphaImage, 0x5)
-{
 	GET(const RectangleStruct*, pBounds, EDI);
-
-	const auto pFog = s_CurrentBuildingFog;
-
-	if (!pFog)
-		return 0;
 
 	const auto pType = pFog->BuildingType;
 
