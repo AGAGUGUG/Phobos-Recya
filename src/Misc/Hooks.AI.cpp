@@ -493,7 +493,7 @@ namespace FoggedObjectHelper
 	{
 		char _[0x24];
 		int OverlayTypeIndex;           // +0x24 覆盖物：类型索引
-		ObjectTypeClass* BuildingType;  // +0x28 建筑：建筑类型
+		ObjectTypeClass* BuildingType;  // +0x28 建筑：冻结时的 BuildingClass*（按 ObjectTypeClass* 读取）
 		int OverlayData;                // +0x2C 覆盖物：数量
 		int FoggedType;                 // +0x30 类别：6=建筑 0x14=覆盖物 0x1D=弹坑
 		CoordStruct Position;           // +0x34 冻结时的位置
@@ -1171,7 +1171,7 @@ DEFINE_HOOK(0x441F60, BuildingClass_AfterDestruction_RemoveFoggedImage, 0x5)
 					const auto pItem = pVector->Items[i];
 					const auto pFields = reinterpret_cast<FoggedObjectHelper::FoggedObjectFields*>(pItem);
 
-					if (pFields->FoggedType == 6 && pFields->BuildingType == pThis && pFields->Position == position)
+					if (pFields->FoggedType == 6 && pFields->BuildingType == reinterpret_cast<ObjectTypeClass*>(pThis) && pFields->Position == position)
 					{
 						FoggedObjectHelper::RemoveFoggedObject(pCell, pItem);
 						return 0;
