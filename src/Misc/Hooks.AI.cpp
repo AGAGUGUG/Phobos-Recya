@@ -481,6 +481,86 @@ namespace FoggedObjectHelper
 			return result;
 		}
 	};
+
+	// FoggedObjectClass 关键字段布局（依据 0x4D0980/0x4D0EF0 的构造与 0x486C50 的清理逻辑）
+	struct FoggedObjectFields
+	{
+		char _[0x24];
+		int OverlayTypeIndex;           // +0x24 覆盖物：类型索引
+		ObjectTypeClass* BuildingType;  // +0x28 建筑：建筑类型
+		int OverlayData;                // +0x2C 覆盖物：数量
+		int FoggedType;                 // +0x30 类别：6=建筑 0x14=覆盖物 0x1D=弹坑
+		CoordStruct Position;           // +0x34 冻结时的位置
+		RectangleStruct RenderDimension;// +0x40 渲染矩形
+	};
+	static_assert(sizeof(FoggedObjectFields) == 0x50u);
+
+	// 游戏内部的坐标→格子换算（与 0x486CA7 处的实现一致）
+	CellStruct CoordToCell(const CoordStruct& coords)
+	{
+		const int x = (coords.X + (coords.X < 0 ? 255 : 0)) >> 8;
+		const int y = (coords.Y + (coords.Y < 0 ? 255 : 0)) >> 8;
+		return CellStruct { static_cast<short>(x), static_cast<short>(y) };
+	}
+
+	// 从格子的迷雾对象向量中移除指定项（保持其余项顺序）
+	void RemoveFromVector(DynamicVectorClass<FoggedObjectClass*>* pVector, FoggedObjectClass* pItem)
+	{
+		for (int i = 0; i < pVector->Count; ++i)
+		{
+			if (pVector->Items[i] == pItem)
+			{
+				for (int j = i + 1; j < pVector->Count; ++j)
+					pVector->Items[j - 1] = pVector->Items[j];
+
+				--pVector->Count;
+				return;
+			}
+		}
+	}
+
+	// 移除一个迷雾冻结对象：按其覆盖范围同步清理所有引用它的格子，标记脏区域后销毁
+	void RemoveFoggedObject(CellClass* pOwnerCell, FoggedObjectClass* pItem)
+	{
+		const auto pFields = reinterpret_cast<FoggedObjectFields*>(pItem);
+		const auto baseCell = CoordToCell(pFields->Position);
+
+		if (pFields->FoggedType == 6)
+		{
+			// 建筑冻结对象同时被其覆盖的每个格子引用（0x4D2790 返回其覆盖范围）
+			const auto pOffsets = reinterpret_cast<CellStruct* (__thiscall*)(FoggedObjectClass*)>(0x4D2790)(pItem);
+
+			if (pOffsets)
+			{
+				for (auto pOffset = pOffsets; ; ++pOffset)
+				{
+					if (*pOffset == CellStruct { 0x7FFF, 0x7FFF })
+						break;
+
+					if (const auto pCell = MapClass::Instance.TryGetCellAt(baseCell + *pOffset))
+					{
+						if (pCell->FoggedObjects)
+							RemoveFromVector(pCell->FoggedObjects, pItem);
+					}
+				}
+			}
+		}
+		else if (pOwnerCell && pOwnerCell->FoggedObjects)
+		{
+			// 非建筑冻结对象只被单个格子引用
+			RemoveFromVector(pOwnerCell->FoggedObjects, pItem);
+		}
+
+		auto rect = pFields->RenderDimension;
+		rect.X -= TacticalClass::Instance->TacticalPos.X;
+		rect.Y -= TacticalClass::Instance->TacticalPos.Y;
+		TacticalClass::Instance->RegisterDirtyArea(rect, 0);
+
+		// 虚表 +0x20 处为标量删除析构（与 0x486D5D 处一致）
+		using DeletingDtor_t = void(__thiscall*)(FoggedObjectClass*, bool);
+		const auto pDtor = reinterpret_cast<DeletingDtor_t*>(*reinterpret_cast<void**>(pItem))[8];
+		pDtor(pItem, true);
+	}
 }
 
 // 重新启用功能
@@ -840,16 +920,213 @@ DEFINE_HOOK(0x4D1B2E, FoggedObjectClass_DrawFoggedObjects_DrawTerrain, 0x6)
 	return SkipGameCode;
 }
 
-// 解决神秘建筑绘制错误
-// 矿石不更新
+#pragma region FoggedEffects
+
+namespace FoggedEffectHelper
+{
+	// 特效可见性判定：两端点都在迷雾中时才视为不可见，任一端可见即绘制
+	__forceinline bool IsCoordFogged(const CoordStruct& coords)
+	{
+		return MapClass::Instance.IsLocationFogged(coords);
+	}
+
+	__forceinline bool IsBeamFogged(const CoordStruct& source, const CoordStruct& target)
+	{
+		return ScenarioClass::Instance->SpecialFlags.FogOfWar
+			&& IsCoordFogged(source) && IsCoordFogged(target);
+	}
+}
+
+// 激光（含飞碟激光分段、激光型尾迹）两端都在迷雾中时跳过绘制
+DEFINE_HOOK(0x550274, LaserDrawClass_Draw_SkipInFog, 0x5)
+{
+	GET(LaserDrawClass* const, pThis, EBX);
+
+	if (FoggedEffectHelper::IsBeamFogged(pThis->Source, pThis->Target))
+		return 0x5509CA;
+
+	return 0;
+}
+
+// 电弧（含电弧型尾迹）两端都在迷雾中时跳过绘制，寿命照常折半递减
+DEFINE_HOOK(0x4C27D5, EBolt_DrawAll_SkipInFog_1, 0x7)
+{
+	GET(EBolt* const, pThis, ESI);
+	GET(int, visible, EAX);
+
+	if ((visible & 0xFF) && FoggedEffectHelper::IsBeamFogged(pThis->Point1, pThis->Point2))
+		return 0x4C281A;
+
+	return 0;
+}
+
+DEFINE_HOOK(0x4C28F9, EBolt_DrawAll_SkipInFog_2, 0x7)
+{
+	GET(EBolt* const, pThis, ESI);
+	GET(int, visible, EAX);
+
+	if ((visible & 0xFF) && FoggedEffectHelper::IsBeamFogged(pThis->Point1, pThis->Point2))
+		return 0x4C293D;
+
+	return 0;
+}
+
+// 辐射波（含辐射型尾迹）两端都在迷雾中时跳过绘制，存活计时照常递增
+DEFINE_HOOK(0x65978C, RadBeam_AI_SkipInFog_1, 0x5)
+{
+	GET(RadBeam* const, pThis, ESI);
+
+	if (*(bool*)((char*)pThis + 9) && FoggedEffectHelper::IsBeamFogged(pThis->SourceLocation, pThis->TargetLocation))
+		return 0x659968;
+
+	return 0;
+}
+
+DEFINE_HOOK(0x659CB7, RadBeam_AI_SkipInFog_2, 0x5)
+{
+	GET(RadBeam* const, pThis, EDI);
+
+	if (*(bool*)((char*)pThis + 9) && FoggedEffectHelper::IsBeamFogged(pThis->SourceLocation, pThis->TargetLocation))
+		return 0x659E09;
+
+	return 0;
+}
+
+// 声波/磁波两端都在迷雾中时跳过绘制，波动推进与伤害逻辑照常执行
+DEFINE_HOOK(0x762C4E, WaveClass_UpdateWave_SkipInFog, 0x6)
+{
+	struct WaveEndpointsFake
+	{
+		char _[0xAC];
+		AbstractClass* SourceObj;  // +0xAC
+		char __[0x12C - 0xB0];
+		bool DrawFlag;             // +0x12C
+		char ___[0x1D4 - 0x12D];
+		AbstractClass* TargetObj;  // +0x1D4
+	};
+
+	GET(WaveClass* const, pThis, ESI);
+	const auto pFake = reinterpret_cast<WaveEndpointsFake*>(pThis);
+
+	if (pFake->SourceObj && pFake->TargetObj)
+	{
+		CoordStruct source;
+		CoordStruct target;
+		pFake->SourceObj->GetCoords(&source);
+		pFake->TargetObj->GetCoords(&target);
+
+		if (FoggedEffectHelper::IsBeamFogged(source, target))
+			return 0x762D57;
+	}
+
+	return 0;
+}
+
+#pragma endregion
+
+// 迷雾中的建筑被摧毁后，移除其冻结在迷雾中的贴图，防止残留
+DEFINE_HOOK(0x441F60, BuildingClass_AfterDestruction_RemoveFoggedImage, 0x5)
+{
+	GET(BuildingClass* const, pThis, ECX);
+
+	if (ScenarioClass::Instance->SpecialFlags.FogOfWar)
+	{
+		const auto pType = pThis->Type;
+		const auto& position = pThis->Location;
+		const auto pFoundation = pThis->GetFoundationData(false);
+		const CellStruct foundationEnd { 0x7FFF, 0x7FFF };
+
+		// 建筑的迷雾冻结对象只有一个，被注册在其覆盖的每个格子中；
+		// 以两种可能的基准格并集扫描，找到后由 RemoveFoggedObject 统一清理全部引用
+		const CellStruct bases[2]
+		{
+			pThis->GetMapCoords(),
+			FoggedObjectHelper::CoordToCell(position)
+		};
+
+		for (const auto& base : bases)
+		{
+			for (auto pOffset = pFoundation; *pOffset != foundationEnd; ++pOffset)
+			{
+				const auto pCell = MapClass::Instance.TryGetCellAt(base + *pOffset);
+
+				if (!pCell || !pCell->FoggedObjects)
+					continue;
+
+				const auto& pVector = pCell->FoggedObjects;
+
+				for (int i = pVector->Count - 1; i >= 0; --i)
+				{
+					const auto pItem = pVector->Items[i];
+					const auto pFields = reinterpret_cast<FoggedObjectHelper::FoggedObjectFields*>(pItem);
+
+					if (pFields->FoggedType == 6 && pFields->BuildingType == pType && pFields->Position == position)
+					{
+						FoggedObjectHelper::RemoveFoggedObject(pCell, pItem);
+						return 0;
+					}
+				}
+			}
+		}
+	}
+
+	return 0;
+}
+
+// 迷雾中矿石被采集后，同步冻结的覆盖物贴图：
+// 数量变化就地更新，类型变化或耗尽则移除后重建（0x480C67 为两条扣减路径的汇合点）
+DEFINE_HOOK(0x480C67, CellClass_ReduceTiberium_SyncFoggedOverlay, 0x6)
+{
+	GET(CellClass* const, pRawCell, ESI);
+
+	// 耗尽路径中 ESI 已被调整为 cell+0x24（&MapCoords），此处还原
+	auto pCell = pRawCell;
+	if (MapClass::Instance.TryGetCellAt(pRawCell->MapCoords) != pRawCell)
+		pCell = reinterpret_cast<CellClass*>(reinterpret_cast<char*>(pRawCell) - 0x24);
+
+	if (!ScenarioClass::Instance->SpecialFlags.FogOfWar
+		|| !pCell->FoggedObjects
+		|| !(pCell->Flags & CellFlags::Fogged))
+	{
+		return 0;
+	}
+
+	const auto& pVector = pCell->FoggedObjects;
+
+	for (int i = pVector->Count - 1; i >= 0; --i)
+	{
+		const auto pItem = pVector->Items[i];
+		const auto pFields = reinterpret_cast<FoggedObjectHelper::FoggedObjectFields*>(pItem);
+
+		if (pFields->FoggedType != 0x14) // 只处理覆盖物冻结对象
+			continue;
+
+		if (pFields->OverlayTypeIndex != pCell->OverlayTypeIndex)
+		{
+			FoggedObjectHelper::RemoveFoggedObject(pCell, pItem);
+
+			// 覆盖物仍存在时重新冻结
+			if (pCell->OverlayTypeIndex != -1)
+			{
+				if (!pCell->FoggedObjects)
+					pCell->FoggedObjects = FoggedObjectHelper::CreateGameDynamicVector();
+
+				static_cast<FoggedObjectHelper::CellClassFake*>(pCell)->FreezeOverlay(pCell->FoggedObjects, true);
+			}
+		}
+		else
+		{
+			// 数量变化：就地更新（绘制侧直接读取这两个字段）
+			pFields->OverlayData = static_cast<int>(pCell->OverlayData);
+		}
+	}
+
+	return 0;
+}
+
+#pragma endregion
+
+// 待处理：
 // 修复Alpha光亮度异常
-// 波动效果要受影响
-// 光照强度要受影响
-// 线尾迹要受影响
-// 激光要受影响
-// 电弧要受影响
-// 辐射波要受影响
-// 波要受影响
-// 飞碟激光要受影响
 
 #pragma endregion
