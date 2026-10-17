@@ -1143,7 +1143,6 @@ DEFINE_HOOK(0x441F60, BuildingClass_AfterDestruction_RemoveFoggedImage, 0x5)
 
 	if (ScenarioClass::Instance->SpecialFlags.FogOfWar)
 	{
-		const auto pType = pThis->Type;
 		const auto& position = pThis->Location;
 		const auto pFoundation = pThis->GetFoundationData(false);
 		const CellStruct foundationEnd { 0x7FFF, 0x7FFF };
@@ -1172,7 +1171,7 @@ DEFINE_HOOK(0x441F60, BuildingClass_AfterDestruction_RemoveFoggedImage, 0x5)
 					const auto pItem = pVector->Items[i];
 					const auto pFields = reinterpret_cast<FoggedObjectHelper::FoggedObjectFields*>(pItem);
 
-					if (pFields->FoggedType == 6 && pFields->BuildingType == pType && pFields->Position == position)
+					if (pFields->FoggedType == 6 && pFields->BuildingType == pThis && pFields->Position == position)
 					{
 						FoggedObjectHelper::RemoveFoggedObject(pCell, pItem);
 						return 0;
