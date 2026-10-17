@@ -853,11 +853,28 @@ DEFINE_HOOK(0x48049E, CellClass_DrawCellSmudge_SkipSmudgeInFog, 0x6)
 	return (pThis->SmudgeTypeIndex != -1 && (!ScenarioClass::Instance->SpecialFlags.FogOfWar || !(pThis->Flags & CellFlags::Fogged))) ? Draw : SkipDraw;
 }
 
-// 被击败或是观察者时揭开所有迷雾，间谍卫星目前只揭开黑幕不管迷雾，感觉可能还是分开好
+// 被击败或是观察者时揭开所有迷雾
 DEFINE_HOOK(0x4FC200, HouseClass_AcceptDefeat_RevealFog, 0x5)
 {
 	if (ScenarioClass::Instance->SpecialFlags.FogOfWar)
 		FoggedObjectHelper::ClearAllFog();
+
+	return 0;
+}
+
+// 修复间谍卫星与迷雾的交互：原版的整图揭幕只清除黑幕（清 ShroudCounter/Gaps、
+// 置 Mapped|NoFog），完全不处理迷雾层——被揭示的格子迷雾标记仍在，却又没有迷雾
+// 快照可画，表现为“看起来全开了”，但真实单位走入这些格子时会因迷雾中不绘制
+// 真实物体而消失。按选定行为，揭示时连同迷雾一并彻底清除。
+DEFINE_HOOK(0x577EE3, DisplayClass_RevealWholeMap_ClearFog, 0x6)
+{
+	GET(CellClass* const, pCell, EAX);
+
+	if (ScenarioClass::Instance->SpecialFlags.FogOfWar)
+	{
+		pCell->Flags &= ~CellFlags::Fogged;
+		pCell->ClearFoggedObjects();
+	}
 
 	return 0;
 }
