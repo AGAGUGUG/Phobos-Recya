@@ -83,6 +83,16 @@ static void __fastcall UpdateAlphaShape(ObjectClass* pSource)
 			inactive = true;
 	}
 
+	// 迷雾中的对象不投射光效：迷雾冻结贴图与迷雾层不消费 alpha 亮度缓冲，
+	// 光效本体不可见，而掩码的变暗部分会被同帧后续绘制的迷雾层消费，在雾面上
+	// 留下暗斑，且每 2 帧注册的大块脏区域会让整片雾区持续无效重绘。
+	// 揭开迷雾后自动恢复。雾中建筑的光效由迷雾冻结绘制分支补画。
+	if (!inactive && ScenarioClass::Instance->SpecialFlags.FogOfWar
+		&& MapClass::Instance.IsLocationFogged(pSource->GetCoords()))
+	{
+		inactive = true;
+	}
+
 	auto& alphaExt = *AresFunctions::AlphaExtMap;
 
 	if (inactive)
