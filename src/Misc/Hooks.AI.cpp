@@ -1081,10 +1081,26 @@ DEFINE_HOOK(0x4D1E46, FoggedObjectClass_DrawFoggedObjects_NullBuildingZSHA, 0x7)
 // 在冻结贴图各段绘制完成后（0x4D2203 为建筑分支段循环的唯一出口），追加一次半透明
 // 光效贴图：以冻结位置为中心（BlitterFlags 含 Centered），被之后绘制的迷雾层罩住，
 // 与建筑本体一致地被雾调暗；帧号跟随当前时间循环，与正常光效的动画节奏一致。
+// 注意：0x4D2203 出口处 EBX 不保证仍指向迷雾对象（实测被循环内逻辑改写导致崩溃），
+// 故在分支入口 0x4D1C4D（此处 EBX 必为刚从全局列表取出的迷雾对象）捕获备用。
+static FoggedObjectHelper::FoggedObjectFields* s_CurrentBuildingFog = nullptr;
+
+DEFINE_HOOK(0x4D1C4D, FoggedObjectClass_DrawFoggedObjects_CaptureBuildingFog, 0x8)
+{
+	GET(FoggedObjectHelper::FoggedObjectFields* const, pFog, EBX);
+
+	s_CurrentBuildingFog = pFog;
+	return 0;
+}
+
 DEFINE_HOOK(0x4D2203, FoggedObjectClass_DrawFoggedObjects_DrawBuildingAlphaImage, 0x5)
 {
-	GET(const FoggedObjectHelper::FoggedObjectFields*, pFog, EBX);
 	GET(const RectangleStruct*, pBounds, EDI);
+
+	const auto pFog = s_CurrentBuildingFog;
+
+	if (!pFog)
+		return 0;
 
 	const auto pType = pFog->BuildingType;
 
