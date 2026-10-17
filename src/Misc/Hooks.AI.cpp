@@ -866,6 +866,8 @@ DEFINE_HOOK(0x4FC200, HouseClass_AcceptDefeat_RevealFog, 0x5)
 // 置 Mapped|NoFog），完全不处理迷雾层——被揭示的格子迷雾标记仍在，却又没有迷雾
 // 快照可画，表现为“看起来全开了”，但真实单位走入这些格子时会因迷雾中不绘制
 // 真实物体而消失。按选定行为，揭示时连同迷雾一并彻底清除。
+// 注意除了下述标记外，还必须重置格子的 Visibility/Foggedness（绘制与选中管线
+// 依据这两个字段判断格子是否可见），未探索过的格子中它们是“完全遮挡”值。
 DEFINE_HOOK(0x577EE3, DisplayClass_RevealWholeMap_ClearFog, 0x6)
 {
 	GET(CellClass* const, pCell, EAX);
@@ -873,6 +875,8 @@ DEFINE_HOOK(0x577EE3, DisplayClass_RevealWholeMap_ClearFog, 0x6)
 	if (ScenarioClass::Instance->SpecialFlags.FogOfWar)
 	{
 		pCell->Flags &= ~CellFlags::Fogged;
+		pCell->Visibility = -1;
+		pCell->Foggedness = -1;
 		pCell->ClearFoggedObjects();
 	}
 
