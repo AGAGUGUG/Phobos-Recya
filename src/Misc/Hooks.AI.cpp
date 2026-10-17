@@ -14,6 +14,12 @@ static bool __forceinline ShouldRemoveSmudgeCell(const int index, const int time
 	{
 		if (pCell->SmudgeTypeIndex != -1)
 		{
+			// 迷雾中的弹坑跳过渐隐推进：冻结弹坑以固定混合标志绘制，本就不跟随渐隐状态，
+			// 推进只会让迷雾格子反复执行昂贵的雾化重绘（冻结对象+雾层+黑幕+光效），毫无视觉
+			// 收益；格子留在集合中，揭开迷雾后从当前状态继续正常渐隐
+			if (ScenarioClass::Instance->SpecialFlags.FogOfWar && (pCell->Flags & CellFlags::Fogged))
+				return false;
+
 			const auto pCellExt = CellExt::Fetch(pCell);
 
 			if ((pCellExt->SmudgeGenerate + time) > current)
@@ -1055,6 +1061,46 @@ DEFINE_HOOK(0x4D1E46, FoggedObjectClass_DrawFoggedObjects_NullBuildingZSHA, 0x7)
 	return 0;
 }
 
+// 迷雾中建筑补画 AlphaImage 光效：正常状态的光效经 AlphaShapeClass 写入 alpha 亮度缓冲、
+// 由后续 blit 消费来呈现，而迷雾冻结贴图与迷雾层不消费该缓冲，导致雾中建筑丢失光效。
+// 在冻结贴图各段绘制完成后（0x4D2203 为建筑分支段循环的唯一出口），追加一次半透明
+// 光效贴图：以冻结位置为中心（BlitterFlags 含 Centered），被之后绘制的迷雾层罩住，
+// 与建筑本体一致地被雾调暗；帧号跟随当前时间循环，与正常光效的动画节奏一致。
+DEFINE_HOOK(0x4D2203, FoggedObjectClass_DrawFoggedObjects_DrawBuildingAlphaImage, 0x5)
+{
+	GET(const FoggedObjectHelper::FoggedObjectFields*, pFog, EBX);
+	GET(const RectangleStruct*, pBounds, EDI);
+
+	const auto pType = pFog->BuildingType;
+
+	if (!pType)
+		return 0;
+
+	const auto pImage = pType->AlphaImage;
+
+	if (!pImage)
+		return 0;
+
+	const auto pCell = MapClass::Instance.TryGetCellAt(FoggedObjectHelper::CoordToCell(pFog->Position));
+
+	if (!pCell)
+		return 0;
+
+	if (!pCell->LightConvert)
+		pCell->InitLightConvert();
+
+	auto point = TacticalClass::Instance->CoordsToClient(pFog->Position).first;
+	point.X += (DSurface::ViewBounds.X - pBounds->X);
+	point.Y += (DSurface::ViewBounds.Y - pBounds->Y);
+
+	const int frame = pImage->Frames > 0 ? static_cast<int>(Unsorted::CurrentFrame / 2) % pImage->Frames : 0;
+
+	DSurface::Temp->DrawSHP(pCell->LightConvert, pImage, frame, &point, pBounds,
+		BlitterFlags(0xE00), 0, 0, ZGradient::Ground, 1000, 0, 0, 0, 0, 0);
+
+	return 0;
+}
+
 // 迷雾中的建筑被摧毁后，移除其冻结在迷雾中的贴图，防止残留
 DEFINE_HOOK(0x441F60, BuildingClass_AfterDestruction_RemoveFoggedImage, 0x5)
 {
@@ -1156,8 +1202,5 @@ DEFINE_HOOK(0x480C67, CellClass_ReduceTiberium_SyncFoggedOverlay, 0x6)
 }
 
 #pragma endregion
-
-// 待处理：
-// 修复Alpha光亮度异常
 
 #pragma endregion
