@@ -70,18 +70,17 @@ namespace FogSpreadHelper
 		}
 
 		const auto count = std::min<size_t>(static_cast<size_t>(rate), PendingCells.size());
-		const auto pTactical = TacticalClass::Instance;
 
 		for (size_t i = 0; i < count; ++i)
 		{
 			const auto coords = PendingCells.back();
 			PendingCells.pop_back();
 
-			if (const auto pCell = pTactical->TryGetCellAt(coords))
+			if (const auto pCell = MapClass::Instance.TryGetCellAt(coords))
 			{
 				// 已被前序扩散处理的格子跳过（去重）
 				if (pCell->Foggedness != -2)
-					reinterpret_cast<void(__thiscall*)(TacticalClass*, const CellStruct*)>(0x4ACC50)(pTactical, &coords);
+					reinterpret_cast<void(__thiscall*)(MapClass*, const CellStruct*)>(0x4ACC50)(&MapClass::Instance, &coords);
 			}
 		}
 	}
