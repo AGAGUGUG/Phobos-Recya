@@ -1,9 +1,10 @@
-﻿﻿#include <New/Entity/AttachmentClass.h>
+#include <New/Entity/AttachmentClass.h>
 
 #include <Ext/Anim/Body.h>
 #include <Ext/Scenario/Body.h>
 #include <Ext/TerrainType/Body.h>
 #include <Utilities/Macro.h>
+#include <Interop/FogOwner.h>
 
 #pragma region SmudgeUpdate
 
@@ -590,13 +591,15 @@ namespace FoggedObjectHelper
 				for (auto pOffset = pOffsets; ; ++pOffset)
 				{
 					if (*pOffset == CellStruct { 0x7FFF, 0x7FFF })
+
 						break;
 
 					if (const auto pCell = MapClass::Instance.TryGetCellAt(baseCell + *pOffset))
 					{
 						if (pCell->FoggedObjects)
 							RemoveFromVector(pCell->FoggedObjects, pItem);
-					}
+}
+
 				}
 			}
 		}
@@ -619,6 +622,9 @@ namespace FoggedObjectHelper
 }
 
 // 重新启用功能
+using FoggedObjectFields = FoggedObjectHelper::FoggedObjectFields;
+using FoggedObjectHelper::RemoveFoggedObject;
+
 DEFINE_HOOK(0x687C56, INIClass_ReadScenario_EnableFog, 0x5)
 {
 	const bool fog = RulesClass::Instance->FogOfWar;
@@ -649,9 +655,25 @@ DEFINE_HOOK(0x4A9CA0, DisplayClass_RevealFogShroud_Reimplement, 0x8)
 	GET_STACK(CellStruct*, pCellStruct, STACK_OFFSET(0x0, 0x4));
 	GET_STACK(HouseClass*, pHouse, STACK_OFFSET(0x0, 0x8));
 	GET_STACK(bool, increase, STACK_OFFSET(0x0, 0xC));
+	// Kaleidoscope fog owner: only the owning house updates the fog
+	if (PhobosFogOwner && pHouse != PhobosFogOwner)
+		return SkipGameCode;
 
 	const auto pCell = pThis->GetCellAt(*pCellStruct);
 	const auto flags = pCell->Flags;
+
+		// Kaleidoscope fog-owner diag (first 8 owner-matching calls)
+	static int s_kdiag = 0;
+	if (PhobosFogOwner && pHouse == PhobosFogOwner && s_kdiag < 8)
+	{
+		++s_kdiag;
+		FILE* f = fopen("fog-diag.log", "a");
+		if (f)
+		{
+			fprintf(f, "reveal house=%p cell=(%d,%d) inc=%d PRE flags=%08X V=%d F=%d\n", (void*)pHouse, pCellStruct->X, pCellStruct->Y, increase ? 1 : 0, (unsigned)pCell->Flags, pCell->Visibility, pCell->Foggedness);
+		}
+	}
+
 	const bool edgeNotRevealed = !(flags & CellFlags::EdgeRevealed);
 	const bool shouldRadarRedraw = edgeNotRevealed || !(pCell->AltFlags & AltCellFlags::Mapped);
 	bool shouldRedraw = shouldRadarRedraw;
@@ -859,11 +881,11 @@ DEFINE_HOOK(0x4ACD1D, DisplayClass_SpreadFog_RateLimit, 0xC)
 }
 
 // 迷雾建筑的冻结动画不经过 AnimClass::DrawIt，而是由 0x4D204D 起的动画段路径直接
-// 绘制（最终 DrawSHP 调用点 0x4D21E4），因此 Phobos 的 XDrawOffset/YDrawOffset 在
-// 此路径不生效。该调用点处绘制点指针位于 [esp+8]，ESI 为段对象：冻结段对象是
-// AnimTypeClass*（0x4D205C 处原版检查 WhatAmI==5，即 AbstractType::AnimType 而非
-// Anim），帧号在冻结时已捕获；另有建筑附属绘制来源经同一调用点，其对象类型不同，
-// 不处理。在此补上偏移，与正常动画路径（AnimClass::DrawIt 的 0x423122 钩子）一致。
+// 绘制（最终 DrawSHP 调用点 0x4D21E4），因此原版 AnimTypeClass::YDrawOffset 与
+// Phobos 的 XDrawOffset 在此路径不生效。该调用点处绘制点指针位于 [esp+8]，ESI 为
+// 段对象：冻结段对象是 AnimTypeClass*（0x4D205C 处原版检查 WhatAmI==5，即
+// AbstractType::AnimType 而非 Anim），帧号在冻结时已捕获；另有建筑附属绘制来源经
+// 同一调用点，其对象类型不同，不处理。在此补上偏移，与正常动画路径行为一致。
 DEFINE_HOOK(0x4D21E4, FoggedObjectClass_DrawFoggedObjects_AnimDrawOffset, 0x6)
 {
 	GET_STACK(Point2D*, pPoint, 0x8);
@@ -871,9 +893,9 @@ DEFINE_HOOK(0x4D21E4, FoggedObjectClass_DrawFoggedObjects_AnimDrawOffset, 0x6)
 
 	if (pPoint && pObj && pObj->WhatAmI() == AbstractType::AnimType)
 	{
-		const auto pTypeExt = AnimTypeExt::Fetch(static_cast<AnimTypeClass*>(pObj));
-		pPoint->X += pTypeExt->XDrawOffset;
-		pPoint->Y += pTypeExt->YDrawOffset;
+		const auto pType = static_cast<AnimTypeClass*>(pObj);
+		pPoint->Y += pType->YDrawOffset;
+		pPoint->X += AnimTypeExt::Fetch(pType)->XDrawOffset;
 	}
 
 	return 0;
@@ -1202,11 +1224,11 @@ DEFINE_HOOK(0x441F60, BuildingClass_AfterDestruction_RemoveFoggedImage, 0x5)
 				for (int i = pVector->Count - 1; i >= 0; --i)
 				{
 					const auto pItem = pVector->Items[i];
-					const auto pFields = reinterpret_cast<FoggedObjectHelper::FoggedObjectFields*>(pItem);
+					const auto pFields = reinterpret_cast<FoggedObjectFields*>(pItem);
 
 					if (pFields->FoggedType == 6 && pFields->BuildingType == reinterpret_cast<ObjectTypeClass*>(pThis) && pFields->Position == position)
 					{
-						FoggedObjectHelper::RemoveFoggedObject(pCell, pItem);
+						RemoveFoggedObject(pCell, pItem);
 						return 0;
 					}
 				}
@@ -1240,14 +1262,14 @@ DEFINE_HOOK(0x480C67, CellClass_ReduceTiberium_SyncFoggedOverlay, 0x6)
 	for (int i = pVector->Count - 1; i >= 0; --i)
 	{
 		const auto pItem = pVector->Items[i];
-		const auto pFields = reinterpret_cast<FoggedObjectHelper::FoggedObjectFields*>(pItem);
+		const auto pFields = reinterpret_cast<FoggedObjectFields*>(pItem);
 
 		if (pFields->FoggedType != 0x14) // 只处理覆盖物冻结对象
 			continue;
 
 		if (pFields->OverlayTypeIndex != pCell->OverlayTypeIndex)
 		{
-			FoggedObjectHelper::RemoveFoggedObject(pCell, pItem);
+			RemoveFoggedObject(pCell, pItem);
 
 			// 覆盖物仍存在时重新冻结
 			if (pCell->OverlayTypeIndex != -1)
