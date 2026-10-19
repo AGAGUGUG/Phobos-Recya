@@ -1018,11 +1018,24 @@ DEFINE_HOOK(0x4D1B2E, FoggedObjectClass_DrawFoggedObjects_DrawTerrain, 0x6)
 	enum { SkipGameCode = 0x4D2311 };
 
 	GET(SHPStruct*, pImage, EAX);
-	GET(const TerrainTypeClass*, pType, ECX);
 	GET(const CoordStruct*, pCoord, ESI);
 	GET(const RectangleStruct*, pBounds, EDI);
 	GET(CellClass*, pCell, EBP);
+	// 不能在这里读 ECX 当 Type：0x4D1B28 的 call [edx+9Ch]（Type 的虚函数，返回 SHP）已经执行过，
+	// ECX 是易失寄存器、可能已被它破坏，之前那样取到的 Type 可能是垃圾；TerrainTypeExt::Fetch
+	// 会顺着垃圾指针得到无效色盘并传给 DrawSHP，底层 blitter 会做出野跳转（EIP 落到非代码地址）
+	// 而崩溃。改为从栈上取游戏在 call 之前保存的 Type 指针（即当时的 ECX，[esp+18h]）。
+	GET_STACK(TerrainTypeClass*, pType, STACK_OFFSET(0x18, 0x0));
 	GET_STACK(int, frame, STACK_OFFSET(0x154, -0x134));
+
+	// 参数校验：任一指针不可信、或该对象并非地形时退回原版绘制。返回 0 会重新执行被覆盖的原
+	// 指令（mov ebx,eax / mov eax,esi / mov ecx,[eax]），它们依赖进入钩子时的 EAX=SHP 与
+	// ESI=坐标指针。Syringe 会保存并恢复整组寄存器，这里再把 EAX 显式写回 SHP 作为双保险。
+	if (!pImage || !pCoord || !pBounds || !pCell || !pType || pType->WhatAmI() != AbstractType::TerrainType)
+	{
+		R->EAX(pImage);
+		return 0;
+	}
 
 	if (pImage)
 	{
