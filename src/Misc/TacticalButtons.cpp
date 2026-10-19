@@ -8,7 +8,7 @@
 #include <AITriggerTypeClass.h>
 #include <JumpjetLocomotionClass.h>
 #include <HoverLocomotionClass.h>
-#include <InputManagerClass.h>
+#include <WWKeyboardClass.h>
 
 #include <Ext/UnitType/Body.h>
 #include <Ext/AircraftType/Body.h>
@@ -145,7 +145,7 @@ void TacticalButtonsClass::CurrentSelectInfoDraw()
 
 			if (pJjLoco || pFlyLoco)
 			{
-				if (InputManagerClass::Instance->IsForceFireKeyPressed() && (pJjLoco ? (pJjLoco->CurrentSpeed > 0.0) : (pFlyLoco && pFlyLoco->CurrentSpeed > 0.0)))
+				if (WWKeyboardClass::Instance->IsForceFireKeyPressed() && (pJjLoco ? (pJjLoco->CurrentSpeed > 0.0) : (pFlyLoco && pFlyLoco->CurrentSpeed > 0.0)))
 				{
 					const auto pDestination = pFoot->Destination;
 					auto curCoord = Point2D { pFoot->Location.X, pFoot->Location.Y };
@@ -238,7 +238,7 @@ void TacticalButtonsClass::CurrentSelectInfoDraw()
 				int cellLevel = (pFootCell->ContainsBridge() && pFoot->OnBridge) ? (pFootCell->Level + 4) : pFootCell->Level;
 				pathCells.emplace_back(pFootCell, cellLevel);
 
-				if (InputManagerClass::Instance->IsForceFireKeyPressed())
+				if (WWKeyboardClass::Instance->IsForceFireKeyPressed())
 				{
 					auto pCell = MapClass::Instance.GetCellAt(pFoot->Locomotor->Head_To_Coord());
 					cellLevel = (pCell->ContainsBridge() && cellLevel == (pCell->Level + 4)) ? (pCell->Level + 4) : pCell->Level;
@@ -293,7 +293,7 @@ void TacticalButtonsClass::CurrentSelectInfoDraw()
 						TechnoExt::DrawExtraImage(pFoot, pCell, drawCoords, DirStruct(face << 13));
 					}
 				}
-				else if (!InputManagerClass::Instance->IsForceMoveKeyPressed())
+				else if (!WWKeyboardClass::Instance->IsForceMoveKeyPressed())
 				{
 					auto pCell = MapClass::Instance.GetCellAt(pFoot->Locomotor->Head_To_Coord());
 					cellLevel = (pCell->ContainsBridge() && cellLevel == (pCell->Level + 4)) ? (pCell->Level + 4) : pCell->Level;
@@ -307,7 +307,7 @@ void TacticalButtonsClass::CurrentSelectInfoDraw()
 		{
 			const auto pType = pBuilding->Type;
 
-			if (InputManagerClass::Instance->IsForceFireKeyPressed())
+			if (WWKeyboardClass::Instance->IsForceFireKeyPressed())
 			{
 				const auto pBase = &pBuilding->Owner->Base;
 
@@ -320,7 +320,7 @@ void TacticalButtonsClass::CurrentSelectInfoDraw()
 					pathCells.emplace_back(pBaseCell, pBaseCell->GetLevel());
 				}
 			}
-			else if (InputManagerClass::Instance->IsForceMoveKeyPressed())
+			else if (WWKeyboardClass::Instance->IsForceMoveKeyPressed())
 			{
 				const auto baseCell = pBuilding->GetMapCoords();
 
@@ -330,7 +330,7 @@ void TacticalButtonsClass::CurrentSelectInfoDraw()
 					pathCells.emplace_back(pBaseCell, pBaseCell->GetLevel());
 				}
 			}
-			else if (InputManagerClass::Instance->IsForceSelectKeyPressed())
+			else if (WWKeyboardClass::Instance->IsForceSelectKeyPressed())
 			{
 				const auto pHouse = pBuilding->Owner;
 				const auto pBase = &pHouse->Base;
@@ -448,7 +448,7 @@ void TacticalButtonsClass::CurrentSelectInfoDraw()
 		std::vector<TempCellData> checkCells;
 		checkCells.reserve(30);
 
-		if (InputManagerClass::Instance->IsForceMoveKeyPressed())
+		if (WWKeyboardClass::Instance->IsForceMoveKeyPressed())
 		{
 			centerCell += CellStruct { 12, 12 };
 
@@ -504,7 +504,7 @@ void TacticalButtonsClass::CurrentSelectInfoDraw()
 				}
 			}
 		}
-		else if (InputManagerClass::Instance->IsForceSelectKeyPressed())
+		else if (WWKeyboardClass::Instance->IsForceSelectKeyPressed())
 		{
 			const int baseIndex = MapClass::Instance.GetCellPathIndex(centerCell);
 			const auto& baseData = MapClass::Instance.LevelAndPassabilityStruct2pointer_70[baseIndex];
@@ -608,7 +608,7 @@ void TacticalButtonsClass::CurrentSelectInfoDraw()
 			drawDashLine(pFoot->MegaTarget, COLOR_CYAN);
 			drawDashLine(pFoot->MegaDestination, COLOR_CYAN);
 
-			if (InputManagerClass::Instance->IsForceSelectKeyPressed())
+			if (WWKeyboardClass::Instance->IsForceSelectKeyPressed())
 			{
 				const auto mtxBase = pFoot->Locomotor ? pFoot->Locomotor->Draw_Matrix(nullptr) : Matrix3D::GetIdentity();
 				const auto rotateRadian = pTechno->PrimaryFacing.Current().GetRadian<32>();
@@ -663,7 +663,7 @@ void TacticalButtonsClass::CurrentSelectInfoDraw()
 			drawDashLine(pTechno->GetNthLink(), COLOR_WHITE);
 			drawDashLine(pTechno->QueueUpToEnter, COLOR_BLUE);
 
-			if (InputManagerClass::Instance->IsForceSelectKeyPressed())
+			if (WWKeyboardClass::Instance->IsForceSelectKeyPressed())
 			{
 				const auto mtxBase = Matrix3D::GetIdentity();
 				const auto rotateRadian = pTechno->PrimaryFacing.Current().GetRadian<32>();

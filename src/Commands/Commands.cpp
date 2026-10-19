@@ -30,7 +30,7 @@
 #include "CycleTypeSelection.h"
 
 #include <CCINIClass.h>
-#include <InputManagerClass.h>
+#include <WWKeyboardClass.h>
 #include <MouseClass.h>
 #include <WWMouseClass.h>
 #include <ShapeButtonClass.h>
@@ -190,9 +190,9 @@ DEFINE_HOOK(0x777998, Game_WndProc_ScrollMouseWheel, 0x6)
 
 static inline bool CheckSkipScrollSidebar()
 {
-	return !Phobos::Config::ScrollSidebarStripWhenHoldAlt && InputManagerClass::Instance->IsForceMoveKeyPressed()
-		|| !Phobos::Config::ScrollSidebarStripWhenHoldCtrl && InputManagerClass::Instance->IsForceFireKeyPressed()
-		|| !Phobos::Config::ScrollSidebarStripWhenHoldShift && InputManagerClass::Instance->IsForceSelectKeyPressed()
+	return !Phobos::Config::ScrollSidebarStripWhenHoldAlt && WWKeyboardClass::Instance->IsForceMoveKeyPressed()
+		|| !Phobos::Config::ScrollSidebarStripWhenHoldCtrl && WWKeyboardClass::Instance->IsForceFireKeyPressed()
+		|| !Phobos::Config::ScrollSidebarStripWhenHoldShift && WWKeyboardClass::Instance->IsForceSelectKeyPressed()
 		|| !Phobos::Config::ScrollSidebarStripInTactical && WWMouseClass::Instance->XY1.X < Make_Global<int>(0xB0CE30) // TacticalClass::view_bound.Width
 		|| DistributionModeHoldDownCommandClass::Enabled
 		|| SelectedInfoClass::Instance.IsHovering
