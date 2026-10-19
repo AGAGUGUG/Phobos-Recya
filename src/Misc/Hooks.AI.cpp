@@ -893,27 +893,6 @@ DEFINE_HOOK(0x4ACD1D, DisplayClass_SpreadFog_RateLimit, 0xC)
 	return 0; // 原版立即递归
 }
 
-// 迷雾建筑的冻结动画不经过 AnimClass::DrawIt，而是由 0x4D204D 起的动画段路径直接
-// 绘制（最终 DrawSHP 调用点 0x4D21E4），因此原版 AnimTypeClass::YDrawOffset 与
-// Phobos 的 XDrawOffset 在此路径不生效。该调用点处绘制点指针位于 [esp+8]，ESI 为
-// 段对象：冻结段对象是 AnimTypeClass*（0x4D205C 处原版检查 WhatAmI==5，即
-// AbstractType::AnimType 而非 Anim），帧号在冻结时已捕获；另有建筑附属绘制来源经
-// 同一调用点，其对象类型不同，不处理。在此补上偏移，与正常动画路径行为一致。
-DEFINE_HOOK(0x4D21E4, FoggedObjectClass_DrawFoggedObjects_AnimDrawOffset, 0x6)
-{
-	GET_STACK(Point2D*, pPoint, 0x8);
-	GET(AbstractClass* const, pObj, ESI);
-
-	if (pPoint && pObj && pObj->WhatAmI() == AbstractType::AnimType)
-	{
-		const auto pType = static_cast<AnimTypeClass*>(pObj);
-		pPoint->Y += pType->YDrawOffset;
-		pPoint->X += AnimTypeExt::Fetch(pType)->XDrawOffset;
-	}
-
-	return 0;
-}
-
 // 让单位在更新视野的时候不会多更新一次之前的视野
 DEFINE_FUNCTION_JUMP(CALL6, 0x415672, FoggedObjectHelper::TechnoClass_RevealLastSight);
 DEFINE_FUNCTION_JUMP(CALL6, 0x4157F7, FoggedObjectHelper::TechnoClass_RevealLastSight);
