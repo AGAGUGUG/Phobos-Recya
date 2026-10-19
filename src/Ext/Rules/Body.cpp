@@ -567,7 +567,11 @@ void RulesExt::ExtData::LoadBeforeTypeData(RulesClass* pThis, CCINIClass* pINI)
 
 	this->SmudgeUpdateTime.Read(exINI, GameStrings::AudioVisual, "SmudgeUpdateTime");
 
-	this->FogSpreadRate.Read(exINI, GameStrings::AudioVisual, "FogSpreadRate");
+	this->FogSpreadRate.Read(exINI, GameStrings::General, "FogSpreadRate");
+
+	this->FogOfWar.Read(exINI, GameStrings::General, "FogOfWar");
+	if (this->FogOfWar.isset())
+		RulesClass::Instance->FogOfWar = this->FogOfWar.Get();
 
 	this->AIAdjacentMax.Read(exINI, GameStrings::AI, "AIAdjacentMax");
 	this->AIAdjacentMax_Campaign.Read(exINI, GameStrings::AI, "AIAdjacentMax.Campaign");

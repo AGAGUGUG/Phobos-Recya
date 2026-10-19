@@ -486,6 +486,8 @@ public:
 
 		Valueable<int> FogSpreadRate;
 
+		Nullable<bool> FogOfWar;
+
 		Valueable<int> AIAdjacentMax;
 		Nullable<int> AIAdjacentMax_Campaign;
 
@@ -1143,6 +1145,8 @@ public:
 			, SmudgeUpdateTime { 0 }
 
 			, FogSpreadRate { 0 }
+
+			, FogOfWar {}
 
 			, AIAdjacentMax { -1 }
 			, AIAdjacentMax_Campaign {}
