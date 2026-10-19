@@ -237,6 +237,7 @@ public:
 	Nullable<bool> Explodes_KillPassengers;
 	Nullable<bool> DriverKilled_KeptPassengers;
 	Nullable<bool> DriverKilled_KillPassengers;
+	Nullable<AffectedSurvivor> Survivors_ReplaceTagTo;
 	Nullable<int> DeployFireWeapon;
 	Valueable<TargetZoneScanType> TargetZoneScanType;
 
@@ -670,7 +671,7 @@ public:
 
 	ValueableVector<int> DefaultToGuardArea_Modes;
 	ValueableVector<int> DefaultToGuardArea_AIModes;
-	
+
 	ValueableVector<int> NoAmmoWeapons;
 	Valueable<bool> NoAmmoWeapons_IgnoreNeverUse;
 
@@ -888,6 +889,7 @@ public:
 		, Explodes_KillPassengers {}
 		, DriverKilled_KeptPassengers {}
 		, DriverKilled_KillPassengers {}
+		, Survivors_ReplaceTagTo {}
 		, DeployFireWeapon {}
 		, TargetZoneScanType { TargetZoneScanType::Same }
 
