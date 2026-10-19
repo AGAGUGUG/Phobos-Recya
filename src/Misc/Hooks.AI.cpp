@@ -51,36 +51,50 @@ namespace FogSpreadHelper
 {
 	std::vector<CellStruct> PendingCells;
 	const ScenarioClass* LastScenario = nullptr;
+	int LastSpreadFrame = 0;
 
-	// 迷雾回填蔓延：原版的迷雾恢复是一次性的递归扩散（0x4ACC50 对自身置完全遮挡后，
-	// 沿遮挡为完全遮挡的邻居立即递归波及整片区域）。FogSpreadRate>0 时扩散前沿的格子
-	// 进入待处理队列，每帧从 Logic AI 尾部取出至多 FogSpreadRate 个格子交给原版扩散
-	// 函数处理，最终状态与原版完全一致，仅恢复过程放缓。
+	// 迷雾蔓延：原版的迷雾恢复是一次性的递归扩散（0x4ACC50 对自身置完全遮挡后，沿遮挡为
+	// 完全遮挡的邻居立即递归波及整片区域）。FogSpreadRate>0 时蔓延前沿的格子进入待处理
+	// 队列，每隔 FogSpreadRate 分钟才把队列整体推进一次（分钟换算为帧与原版 BuildupTime
+	// 一致，1 分钟 = 900 帧），最终状态与原版完全一致，仅蔓延过程放缓。
 	void ProcessQueue()
 	{
-		const int rate = RulesExt::Global()->FogSpreadRate;
-
-		if (rate <= 0 || PendingCells.empty())
-			return;
-
-		// 对局切换后丢弃上一局的残留队列
+		// 对局切换后丢弃上一局的残留队列并重新计时
 		if (ScenarioClass::Instance != LastScenario)
 		{
 			LastScenario = ScenarioClass::Instance;
+			LastSpreadFrame = Unsorted::CurrentFrame;
 			PendingCells.clear();
 			return;
 		}
 
-		const auto count = std::min<size_t>(static_cast<size_t>(rate), PendingCells.size());
+		const double minutes = RulesExt::Global()->FogSpreadRate;
 
-		for (size_t i = 0; i < count; ++i)
+		if (minutes <= 0.0 || PendingCells.empty())
+			return;
+
+		int interval = static_cast<int>(minutes * 900.0);
+
+		if (interval < 1)
+			interval = 1;
+
+		const int current = Unsorted::CurrentFrame;
+
+		if ((current - LastSpreadFrame) < interval)
+			return;
+
+		LastSpreadFrame = current;
+
+		// 本次蔓延：队列中的格子交给原版扩散函数，它们递归出的新前沿格子会在钩子中重新
+		// 入队，等待下一个间隔
+		const auto cells = std::move(PendingCells);
+		PendingCells.clear();
+
+		for (const auto& coords : cells)
 		{
-			const auto coords = PendingCells.back();
-			PendingCells.pop_back();
-
 			if (const auto pCell = MapClass::Instance.TryGetCellAt(coords))
 			{
-				// 已被前序扩散处理的格子跳过（去重）
+				// 已被前序蔓延处理的格子跳过（去重）
 				if (pCell->Foggedness != -2)
 					reinterpret_cast<void(__thiscall*)(MapClass*, const CellStruct*)>(0x4ACC50)(&MapClass::Instance, &coords);
 			}
@@ -95,8 +109,7 @@ DEFINE_HOOK(0x55B6B3, LogicClass_AI_After, 0x5)
 	for (auto const& attachment : AttachmentClass::Array)
 		attachment->AI();
 
-	if (ScenarioClass::Instance->SpecialFlags.FogOfWar)
-		FogSpreadHelper::ProcessQueue();
+	FogSpreadHelper::ProcessQueue();
 
 	const int time = RulesExt::Global()->SmudgeUpdateTime;
 
@@ -862,7 +875,7 @@ DEFINE_HOOK(0x4ACBC4, MapClass_FogSpread_SkipWithSpySat, 0x5)
 }
 
 // 迷雾扩散的递归调用点：原版在此立即递归处理完全遮挡的邻居。FogSpreadRate>0 时
-// 改为入队等待逐帧处理（见 FogSpreadHelper::ProcessQueue），蔓延速率由此可控。
+// 改为入队等待按间隔处理（见 FogSpreadHelper::ProcessQueue），蔓延间隔由此可控。
 // 注意该处 ESI 为邻居格子（0x4ACCFB 处取得），且仅在"邻居遮挡为完全遮挡且尚未
 // 处理"时到达（0x4ACD10/0x4ACD15 的两道检查已通过）。
 DEFINE_HOOK(0x4ACD1D, DisplayClass_SpreadFog_RateLimit, 0xC)
@@ -871,7 +884,7 @@ DEFINE_HOOK(0x4ACD1D, DisplayClass_SpreadFog_RateLimit, 0xC)
 
 	GET(CellClass* const, pNeighbor, ESI);
 
-	if (RulesExt::Global()->FogSpreadRate > 0 && FogSpreadHelper::PendingCells.size() <= 200000u)
+	if (RulesExt::Global()->FogSpreadRate > 0.0 && FogSpreadHelper::PendingCells.size() <= 200000u)
 	{
 		FogSpreadHelper::PendingCells.push_back(pNeighbor->MapCoords);
 		return SkipRecursion;
